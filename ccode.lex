@@ -26,8 +26,6 @@ WS  [ \t\v\n\f]
 #include <stdio.h>
 #include "ccode.tab.h"
 
-extern void yyerror(const char *);  /* prints grammar violation message */
-
 %}
 
 %option nounput
@@ -43,6 +41,7 @@ extern void yyerror(const char *);  /* prints grammar violation message */
 <COMMENT>"*/"                           { BEGIN(INITIAL); }
 
 "//".*                                  { /* consume //-comment */ }
+"#".*                                   { /* return PREPROC; */ }
 
 "auto"                                  { return(AUTO); }
 "break"                                 { return(BREAK); }
@@ -158,12 +157,13 @@ extern void yyerror(const char *);  /* prints grammar violation message */
 
 %%
 
-
+#ifdef LEXMAIN
 int main()
 {
   int tok;
   while ((tok = yylex()) != 0) {
-    printf("tok: %d", tok);
+    printf("tok: %d\n", tok);
   }
   return 0;
 }
+#endif /* LEXMAIN */
