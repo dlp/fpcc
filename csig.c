@@ -1,17 +1,11 @@
 /*
- *  sig.c - written by Rob Pike, modified by Loki
- *
- *  This program doesn't quite do what the specification says.
- *  It adds a '-o outfile' option which allows the user to
- *  specify which file should receive the output (rather than
- *  always going to stdout). The default is still stdout.
- *  It also doesn't use stdin as input. This was done so that
- *  the usage message would appear if the user just types 'sig'.
+ *  csig.c - based on sig.c written by Rob Pike
  */
 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include <openssl/md5.h>
 
@@ -27,82 +21,67 @@ FILE *		outfile;
 
 void	signature(FILE*);
 
+const char *program_name = "csig";
+
 void usage(void)
 {
-	fprintf(stderr, "usage: sig");
-	fprintf(stderr, " [-z zerobits]");
-	fprintf(stderr, " [-n chainlength]");
-	fprintf(stderr, " [-o outfile]");
-	fprintf(stderr, " file ...\n");
-
-	fprintf(stderr, "defaults:");
-	fprintf(stderr, " zerobits=4");
-	fprintf(stderr, " chainlength=5");
-	fprintf(stderr, " outfile=the screen");
-	fprintf(stderr, "\n");
-	exit(2);
+  (void) fprintf(stderr, "USAGE: %s [-z zerobits] [-n chainlength]"
+                         " [-o outfile] file...\n", program_name);
+  (void) fprintf(stderr, "  defaults: zerobits=%d chainlength=%d\n",
+      Zerobits, Ntoken);
+  exit(2);
 }
 
 int main(int argc, char *argv[])
 {
 	FILE *f;
-	int i, start, nfiles;
-	char *s, *outname;
+	int  nfiles;
+	char *outname;
 
 	outfile = stdout;
 	outname = NULL;
 
-	for (start=1; start < argc; start++) {
-		if (argv[start][0] != '-')
-			break;
-		switch (argv[start][1]) {
-		case 'z':
-			s = argv[++start];
-			if (s == NULL)
-				usage();
-			Zerobits = atoi(s);
-			if (Zerobits < 0 || Zerobits > 31)
-				usage();
-			break;
-		case 'n':
-			s = argv[++start];
-			if (s == NULL)
-				usage();
-			Ntoken = atoi(s);
-			if (Ntoken <= 0)
-				usage();
-			break;
-		case 'o':
-			s = argv[++start];
-			if (s == NULL)
-				usage();
-			outname = s;
-			break;
-		default:
-			usage();
-		}
+        int c;
+	while ((c = getopt(argc, argv, "z:n:o:")) != -1) {
+          switch (c) {
+            case 'z':
+              Zerobits = atoi(optarg);
+              if (Zerobits < 0 || Zerobits > 31)
+                usage();
+              break;
+            case 'n':
+              Ntoken = atoi(optarg);
+              if (Ntoken <= 0)
+                usage();
+              break;
+            case 'o':
+              outname = optarg;
+              break;
+            case '?':
+            default:
+              usage();
+          }
 	}
 
-	nfiles = argc - start;
-	if (nfiles < 1)
-		usage();
+	nfiles = argc - optind;
+	if (nfiles < 1) usage();
 
 	if (outname != NULL)
 		outfile = fopen(outname, "w");
 
 	zeromask = (1<<Zerobits)-1;
 
-	for (i=start; i < argc; i++) {
-		f = fopen(argv[i], "r");
-		if (f == NULL) {
-			fprintf(stderr, "sig: can't open %s:", argv[i]);
-			perror(NULL);
-			continue;
-		}
-		signature(f);
-		fclose(f);
+	for (int i = optind; i < argc; i++) {
+          f = fopen(argv[i], "r");
+          if (f == NULL) {
+            (void) fprintf(stderr,
+                "%s: can't open %s:", program_name, argv[i]);
+            perror(NULL);
+            continue;
+          }
+          signature(f);
+          (void) fclose(f);
 	}
-
 	return 0;
 }
 
@@ -154,4 +133,3 @@ void signature(FILE *f)
     dotoken(tok);
   }
 }
-
