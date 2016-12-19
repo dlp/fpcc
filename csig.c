@@ -102,35 +102,43 @@ unsigned long hash(int tok[])
   return result.h;
 }
 
-void dotoken(int x)
+/*
+ * Get the next hash.
+ *
+ * Continuously reads tokens from lexer, forms n-grams,
+ * and returns their hashes.
+ * Return the hash for the next n-gram or 0 if no tokens are left.
+ */
+unsigned long next_hash(void)
 {
   static int ntoken = 0;
-  unsigned long h;
+  int tok;
+  while ((tok = yylex()) != 0) {
+    // shift chain-window
+    for (int i=Ntoken; --i > 0; )
+      token[i] = token[i-1];
+    token[0] = tok;
 
-  for (int i=Ntoken; --i > 0; )
-    token[i] = token[i-1];
-  token[0] = x;
+    // fill the first chain
+    if (++ntoken < Ntoken) continue;
 
-  // fill the first chain
-  if (++ntoken < Ntoken) return;
-
-  h = hash(token);
-  // mod-p fingerprinting -> to be replaced by winnowing
-  if ((h & zeromask) == 0) {
-    (void) fprintf(outfile, "%0lx\n", h>>Zerobits);
-    //(void) fprintf(outfile, "%016lx %d\n", h>>Zerobits, x);
+    return hash(token);
   }
+  return 0;
 }
 
 
 void signature(FILE *f)
 {
   token = malloc(Ntoken * sizeof(int));
-
   yyin = f;
-  int tok;
-  while ((tok = yylex()) != 0) {
-    dotoken(tok);
+
+  unsigned long h;
+  while ((h = next_hash()) != 0) {
+    // mod-z fingerprinting -> to be replaced by winnowing
+    if ((h & zeromask) == 0) {
+      (void) fprintf(outfile, "%0lx\n", h>>Zerobits);
+    }
   }
 }
 
