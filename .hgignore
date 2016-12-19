@@ -1,0 +1,9 @@
+syntax: glob
+
+*.o
+csig
+ccode.tab.c
+ccode.tab.h
+lex.yy.c
+sigcomp/comp
+sigcomp/sig
