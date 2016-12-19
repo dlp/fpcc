@@ -1,5 +1,7 @@
 /*
  *  csig.c - based on sig.c written by Rob Pike
+ *
+ *  This variant of fingerprinting uses a C lexer and winnowing.
  */
 
 #include <stdint.h>
@@ -10,102 +12,126 @@
 
 #include <openssl/md5.h>
 
-
-#define DEFAULT_NTOKEN   5
-#define DEFAULT_ZEROBITS 4
+#define DEFAULT_NTOKEN     5
+#define DEFAULT_WINNOWSIZE 4
 
 typedef uint64_t hash_t;
 
+// we are using our generated scanner
 extern int yylex (void);
 extern FILE *yyin;
 
-int		Ntoken   = DEFAULT_NTOKEN;
-static          int ntoken;
-int		Zerobits = DEFAULT_ZEROBITS;
-int *		token;
-FILE *		outfile;
+int Ntoken     = DEFAULT_NTOKEN;
+int Winnowsize = DEFAULT_WINNOWSIZE;
 
-void	signature(FILE*);
+static int ntoken; // number of tokens read for current file
+static int *tokenbuf; // buffer for tokens
+
+int hash_count; // number of hashes written
+FILE *outfile;
+
+void winnow(int w);
 
 const char *program_name = "csig";
 
 void usage(void)
 {
-  (void) fprintf(stderr, "USAGE: %s [-z zerobits] [-n chainlength]"
+  (void) fprintf(stderr, "USAGE: %s [-n chainlength] [-w winnow]"
                          " [-o outfile] file...\n", program_name);
-  (void) fprintf(stderr, "  defaults: zerobits=%d chainlength=%d\n",
-      DEFAULT_ZEROBITS, DEFAULT_NTOKEN);
-  exit(2);
+  (void) fprintf(stderr, "  defaults: chainlength=%d winnow=%d\n",
+      DEFAULT_NTOKEN, DEFAULT_WINNOWSIZE);
+  exit(EXIT_FAILURE);
+}
+
+
+long int parse_num(const char *s)
+{
+  char *eptr;
+  long int res;
+
+  res = strtol(s, &eptr, 10);
+  if (*eptr != '\0') usage();
+  return res;
 }
 
 int main(int argc, char *argv[])
 {
-	FILE *f;
-	int  nfiles;
-	char *outname;
-        int opt_z=0, opt_n=0, opt_o=0;
 
-	outfile = stdout;
-	outname = NULL;
+  int opt_n=0, opt_w=0, opt_o=0;
 
-        int c;
-	while ((c = getopt(argc, argv, "z:n:o:")) != -1) {
-          switch (c) {
-            case 'z':
-              if (opt_z++ > 0) usage();
-              Zerobits = atoi(optarg);
-              if (Zerobits < 0 || Zerobits > 31)
-                usage();
-              break;
-            case 'n':
-              if (opt_n++ > 0) usage();
-              Ntoken = atoi(optarg);
-              if (Ntoken <= 0)
-                usage();
-              break;
-            case 'o':
-              if (opt_o++ > 0) usage();
-              outname = optarg;
-              break;
-            case '?':
-            default:
-              usage();
-          }
-	}
+  outfile = stdout;
 
-	nfiles = argc - optind;
-	if (nfiles < 1) usage();
+  int c;
+  while ((c = getopt(argc, argv, "n:w:o:")) != -1) {
+    switch (c) {
+      case 'n':
+        if (opt_n++ > 0) usage();
+        Ntoken = parse_num(optarg);
+        if (Ntoken <= 0)
+          usage();
+        break;
+      case 'w':
+        if (opt_w++ > 0) usage();
+        Winnowsize = parse_num(optarg);
+        break;
+      case 'o':
+        if (opt_o++ > 0) usage();
+        outfile = fopen(optarg, "w");
+        if (outfile == NULL) {
+          perror("opening outfile");
+          exit(EXIT_FAILURE);
+        }
+        break;
+      case '?':
+      default:
+        usage();
+    }
+  }
+  // at least one file needs to be specified
+  if (argc - optind < 1) usage();
 
-	if (outname != NULL)
-		outfile = fopen(outname, "w");
+  // allocate k-gram buffer
+  tokenbuf = malloc(Ntoken * sizeof(int));
+  if (tokenbuf == NULL) {
+    (void) fprintf(stderr, "%s: can't allocate buffer", program_name);
+    exit(EXIT_FAILURE);
+  }
 
+  // for each file specified, call winnowing routine
+  for (int i = optind; i < argc; i++) {
+    yyin = fopen(argv[i], "r");
+    if (yyin == NULL) {
+      (void) fprintf(stderr,
+          "%s: can't open %s:", program_name, argv[i]);
+      perror(NULL);
+      continue;
+    }
+    ntoken = 0;
+    hash_count = 0;
+    winnow(Winnowsize); // main winnowing routine
+    (void) fclose(yyin);
+  }
 
-	for (int i = optind; i < argc; i++) {
-          f = fopen(argv[i], "r");
-          if (f == NULL) {
-            (void) fprintf(stderr,
-                "%s: can't open %s:", program_name, argv[i]);
-            perror(NULL);
-            continue;
-          }
-          signature(f);
-          (void) fclose(f);
-	}
-	return 0;
+  (void) free(tokenbuf);
+
+  if (outfile != stdout)
+    (void) fclose(outfile);
+
+  return 0;
 }
 
-hash_t hash(int tok[])
+
+hash_t hash(void)
 {
   MD5_CTX md5;
   union {
     unsigned char digest[16];
     hash_t h;
   } result;
-  int i;
 
   MD5_Init(&md5);
-  for (i=0; i < Ntoken; i++) {
-    MD5_Update(&md5, &tok[i], sizeof tok[i]);
+  for (int i=0; i < Ntoken; i++) {
+    MD5_Update(&md5, &tokenbuf[i], sizeof tokenbuf[i]);
   }
   MD5_Final(result.digest, &md5);
   return result.h;
@@ -123,14 +149,14 @@ hash_t next_hash(void)
   int tok;
   while ((tok = yylex()) != 0) {
     // shift chain-window
-    for (int i=Ntoken; --i > 0; )
-      token[i] = token[i-1];
-    token[0] = tok;
+    for (int i = Ntoken; --i > 0; )
+      tokenbuf[i] = tokenbuf[i-1];
+    tokenbuf[0] = tok;
 
     // fill the first chain
     if (++ntoken < Ntoken) continue;
 
-    return hash(token);
+    return hash();
   }
   return 0;
 }
@@ -142,44 +168,13 @@ hash_t next_hash(void)
 void record(hash_t h)
 {
   (void) fprintf(outfile, "%0lx\n", h);
+  hash_count++;
 }
 
-
-/**
- * Perform mod-z fingerprinting
- * Return the number of fingerprints.
- */
-int modulo_fp(void)
-{
-  hash_t h, zeromask;
-  int count = 0;
-
-  zeromask = (1<<Zerobits)-1;
-
-  while ((h = next_hash()) != 0) {
-    if ((h & zeromask) == 0) {
-      record(h>>Zerobits);
-      count++;
-    }
-  }
-  return count;
-}
-
-
-void signature(FILE *f)
-{
-  token = malloc(Ntoken * sizeof(int));
-  ntoken = 0;
-  yyin = f;
-
-  (void) modulo_fp();
-}
-
-#if 0
 void winnow(int w) {
   // circular buffer implementing window of size w
-  hash_t h[w];
-  for (int i=0; i<w; ++i) h[i] = INT_MAX;
+  hash_t h, window[w];
+  for (int i=0; i<w; ++i) window[i] = UINT64_MAX;
   int r = 0;      // window right end
   int min = 0;    // index of minimum hash
   // At the end of each iteration, min holds the
@@ -187,27 +182,26 @@ void winnow(int w) {
   // current window.  record(x) is called only the
   // first time an instance of x is selected as the
   // rightmost minimal hash of a window.
-  while (true) {
-    r = (r + 1) % w;      // shift the window by one
-    h[r] = next_hash();   // and add one new hash
+  while ((h = next_hash()) != 0) {
+    r = (r + 1) % w; // shift the window by one
+    window[r] = h;   // and add one new hash
     if (min == r) {
       // The previous minimum is no longer in this
-      // window.  Scan h leftward starting from r
+      // window.  Scan leftward starting from r
       // for the rightmost minimal hash.  Note min
       // starts with the index of the rightmost
       // hash.
-      for(int i=(r-1)%w; i!=r; i=(i-1+w)%w)
-        if (h[i] < h[min]) min = i;
-      record(h[min], global_pos(min, r, w));
+      for (int i = (r-1+w)%w; i != r; i = (i-1+w)%w)
+        if (window[i] < window[min]) min = i;
+      record(window[min]);
     } else {
       // Otherwise, the previous minimum is still in
       // this window. Compare against the new value
       // and update min if necessary.
-      if (h[r] <= h[min]) {  // (*)
-        min=r;
-        record(h[min], global_pos(min, r, w));
+      if (window[r] <= window[min]) {  // '<' for robust winnowing
+        min = r;
+        record(window[min]);
       }
     }
   }
 }
-#endif
