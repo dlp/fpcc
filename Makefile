@@ -27,5 +27,5 @@ csig: LDLIBS = -lcrypto
 csig: csig.o lex.yy.o
 
 clean:
-	rm -f ccode.tab.{c,h} lex.yy.c *.o ccode.output
+	rm -f ccode.tab.{c,h} lex.yy.c *.o
 	rm -f csig
