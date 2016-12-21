@@ -1,9 +1,8 @@
-/*
+/**
  *  csig.c - based on sig.c written by Rob Pike
  *
  *  This variant of fingerprinting uses a C lexer and winnowing.
  */
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
