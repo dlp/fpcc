@@ -1,159 +1,168 @@
-/*
- *  comp.c - written by Rob Pike, modified by Loki.
- *
- *  This program doesn't quite do what the specification says.
- *  It treats all filenames on the command line which begin with '-'
- *  as options, but since the only option is '-t' any other names
- *  result in a usage message.
+/**
+ * comp.c - compare two fingerprints produced by csig
  */
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 
-int thresh = 20;
+#define DEFAULT_THRESHOLD 20
 
-typedef struct Sig Sig;
-struct Sig
-{
-	int		nval;
-	unsigned long	*val;
-};
+typedef uint64_t hash_t;
 
-Sig	*load(char*);
-int	compare(Sig*, Sig*);
+typedef struct {
+  unsigned nval;
+  hash_t *val;
+} sig_t;
+
+int thresh = DEFAULT_THRESHOLD;
+
+const char *program_name = "comp";
+
+sig_t *load(const char*);
+int compare(sig_t*, sig_t*);
 
 void usage(void)
 {
-	fprintf(stderr, "usage: comp [-t threshold%%] sigfile othersigfile ...\n");
-	fprintf(stderr, "defaults: threshold=20%%\n");
-	exit(2);
+  (void) fprintf(stderr, "USAGE: %s [-t threshold] sigfile1 sigfile2...\n",
+      program_name);
+  (void) fprintf(stderr, "  defaults: threshold=%d\n", DEFAULT_THRESHOLD);
+  exit(EXIT_FAILURE);
+}
+
+long int parse_num(const char *s)
+{
+  char *eptr;
+  long int res;
+
+  res = strtol(s, &eptr, 10);
+  if (*eptr != '\0') usage();
+  return res;
 }
 
 int main(int argc, char *argv[])
 {
-	int i, j, nfiles, start, percent;
-	char *s;
-	Sig **sig;
+  int opt_t=0;
 
-	for (start=1; start < argc; start++) {
-		if (argv[start][0] != '-')
-			break;	/* finished handling options */
-		switch (argv[start][1]) {
-		case 't':
-			s = argv[++start];
-			if (s == NULL)
-				usage();
-			thresh = atoi(s);
-			if (thresh < 0 || thresh > 100)
-				usage();
-			break;
-		default:
-			usage();
-		}
-	}
+  int c;
+  while ((c = getopt(argc, argv, "t:")) != -1) {
+    switch (c) {
+      case 't':
+        if (opt_t++ > 0) usage();
+        thresh = parse_num(optarg);
+        if (thresh < 0 || thresh > 100)
+          usage();
+        break;
+      case '?':
+      default:
+        usage();
+    }
+  }
+  // at least two files need to be specified
+  int nfiles = argc - optind;
+  if (nfiles < 2) usage();
 
-	nfiles = argc - start;
-	if (nfiles < 2)
-		usage();
+  sig_t **sig = malloc(nfiles * sizeof(sig_t*));
+  if (sig == NULL) {
+    (void) fprintf(stderr, "%s: can't allocate buffer", program_name);
+    exit(EXIT_FAILURE);
+  }
 
-	sig = malloc(nfiles * sizeof(Sig*));
-	for (i=0; i < nfiles; i++)
-		sig[i] = load(argv[i+start]);
+  for (int i=0; i < nfiles; i++) {
+    sig[i] = load(argv[i+optind]);
+  }
 
-	for (i=0; i < nfiles; i++)
-		for (j=i+1; j < nfiles; j++) {
-			percent = compare(sig[i], sig[j]);
-			if (percent >= thresh)
-				printf("%s and %s: %d%%\n", argv[i+start], argv[j+start], percent);
-		}
+  for (int i=0; i < nfiles; i++) {
+    for (int j=i+1; j < nfiles; j++) {
+      int percent = compare(sig[i], sig[j]);
+      if (percent >= thresh)
+        printf("%s and %s: %d%%\n", argv[i+optind], argv[j+optind], percent);
+    }
+  }
 
-	return 0;
+  return 0;
 }
 
-/* ulcmp:  compare *p1 and *p2 */
-int ulcmp(const void *p1, const void *p2)
+int hash_cmp(const hash_t *h1, const hash_t *h2)
 {
-	unsigned long v1, v2;
-
-	v1 = *(unsigned long *) p1;
-	v2 = *(unsigned long *) p2;
-	if (v1 < v2)
-		return -1;
-	else if (v1 == v2)
-		return 0;
-	else
-		return 1;
+  if (*h1 < *h2) return -1;
+  if (*h1 > *h2) return 1;
+  return 0;
 }
 
-Sig* load(char *file)
+sig_t *load(const char *file)
 {
-	FILE *f;
-	int nv, na;
-	unsigned long *v, x;
-	char buf[512], *p;
-	Sig *sig;
+  FILE *f;
+  int nv, na;
+  hash_t *v, x;
+  char buf[512];
 
-	f = fopen(file, "r");
-	if (f == NULL) {
-		fprintf(stderr, "comp: can't open %s:", file);
-		perror(NULL);
-		exit(2);
-	}
+  f = fopen(file, "r");
+  if (f == NULL) {
+    (void) fprintf(stderr, "%s: can't open %s:", program_name, file);
+    perror(NULL);
+    exit(EXIT_FAILURE);
+  }
 
-	v = NULL;
-	na = 0;
-	nv = 0;
-	while (fgets(buf, sizeof buf, f) != NULL) {
-		p = NULL;
-		x = strtoul(buf, &p, 16);
-		if (p==NULL || p==buf){
-			fprintf(stderr, "comp: bad signature file %s\n", file);
-			exit(2);
-		}
-		if (nv == na) {
-			na += 100;
-			v = realloc(v, na*sizeof(unsigned long));
-		}
-		v[nv++] = x;
-	}
-	fclose(f);
+  v = NULL;
+  na = 0;
+  nv = 0;
+  while (fgets(buf, sizeof buf, f) != NULL) {
+    char *p = NULL;
+    x = strtoul(buf, &p, 16);
+    if (p==NULL || p==buf){
+      (void) fprintf(stderr, "%s: bad signature file %s\n",
+          program_name, file);
+      exit(EXIT_FAILURE);
+    }
+    if (nv == na) {
+      na += 100;
+      hash_t *new_v = realloc(v, na*sizeof(hash_t));
+      if (new_v == NULL) {
+        (void) fprintf(stderr, "%s: cannot reallocate memory\n",
+            program_name);
+        exit(EXIT_FAILURE);
+      }
+      v = new_v;
+    }
+    v[nv++] = x;
+  }
+  (void) fclose(f);
 
-	qsort(v, nv, sizeof(v[0]), ulcmp);
+  qsort(v, nv, sizeof(v[0]), (int (*)(const void *, const void *))hash_cmp);
 
-	sig = malloc(sizeof(Sig));
-	sig->nval = nv;
-	sig->val = v;
-	return sig;
+  sig_t *sig = malloc(sizeof(sig_t));
+  if (sig == NULL) {
+    (void) fprintf(stderr, "%s: cannot allocate signature\n",
+        program_name);
+    exit(EXIT_FAILURE);
+  }
+  sig->nval = nv;
+  sig->val = v;
+  return sig;
 }
 
 
-int compare(Sig *s0, Sig *s1)
+int compare(sig_t *s0, sig_t *s1)
 {
-	int i0, i1, nboth, cmp;
+  int i0=0, i1=0, nboth=0;
 
-	i0 = 0;
-	i1 = 0;
-	nboth = 0;
-	while (i0 < s0->nval || i1 < s1->nval) {
-          cmp = 0;
-          if (!(i0 < s0->nval)) {
-            cmp = 1;
-          } else if (!(i1 < s1->nval)) {
-            cmp = -1;
-          } else {
-            if  (s0->val[i0] > s1->val[i1]) {
-              cmp = 1;
-            } else if (s0->val[i0] < s1->val[i1]) {
-              cmp = -1;
-            } else {
-              nboth++;
-            }
-          }
-          if (cmp <= 0) i0++;
-          if (cmp >= 0) i1++;
-	}
-	return 100 * 2*nboth / (s0->nval + s1->nval);
-	/* return 100 * nboth / (s0->nval + s1->nval - nboth); */
+  while (i0 < s0->nval || i1 < s1->nval) {
+    int cmp = 0;
+    if (!(i0 < s0->nval)) {
+      cmp = 1;
+    } else if (!(i1 < s1->nval)) {
+      cmp = -1;
+    } else {
+      cmp = hash_cmp(&s0->val[i0], &s1->val[i1]);
+    }
+    if (cmp == 0) nboth++;
+    if (cmp <= 0) i0++;
+    if (cmp >= 0) i1++;
+  }
+  // similarity of A and B = intersect(A, B)/union(A, B)
+  return 100 * 2 * nboth / (s0->nval + s1->nval);
 }
 

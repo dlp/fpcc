@@ -9,7 +9,7 @@ OBJS =
 
 .PHONY: all clean
 
-all: csig
+all: csig comp
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
@@ -25,6 +25,8 @@ lex.yy.c: ccode.lex
 
 csig: LDLIBS = -lcrypto
 csig: csig.o lex.yy.o
+
+comp: comp.o
 
 clean:
 	rm -f ccode.tab.{c,h} lex.yy.c *.o
