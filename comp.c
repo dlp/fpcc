@@ -2,31 +2,25 @@
  * comp.c - compare two fingerprints produced by csig
  */
 
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
 
-#define DEFAULT_THRESHOLD 20
+#include "common.h"
 
-typedef uint64_t hash_t;
 
-typedef struct {
-  unsigned nval;
-  hash_t *val;
-} sig_t;
 
 int thresh = DEFAULT_THRESHOLD;
 
 const char *program_name = "comp";
 
-sig_t *load(const char*);
-int compare(sig_t*, sig_t*);
+void load(const char *, sig_t *);
+int compare(sig_t *, sig_t *);
 
 void usage(void)
 {
-  (void) fprintf(stderr, "USAGE: %s [-t threshold] sigfile1 sigfile2...\n",
+  (void) fprintf(stderr, "USAGE: %s [-t threshold] sigfile1 sigfile2\n",
       program_name);
   (void) fprintf(stderr, "  defaults: threshold=%d\n", DEFAULT_THRESHOLD);
   exit(EXIT_FAILURE);
@@ -60,27 +54,20 @@ int main(int argc, char *argv[])
         usage();
     }
   }
-  // at least two files need to be specified
+  // exaclty two files need to be specified
   int nfiles = argc - optind;
-  if (nfiles < 2) usage();
+  if (nfiles != 2) usage();
 
-  sig_t **sig = malloc(nfiles * sizeof(sig_t*));
-  if (sig == NULL) {
-    (void) fprintf(stderr, "%s: can't allocate buffer", program_name);
-    exit(EXIT_FAILURE);
-  }
+  const char *fname1, *fname2;
+  fname1 = argv[optind];
+  fname2 = argv[optind + 1];
+  sig_t sig1, sig2;
+  load(fname1, &sig1);
+  load(fname2, &sig2);
 
-  for (int i=0; i < nfiles; i++) {
-    sig[i] = load(argv[i+optind]);
-  }
-
-  for (int i=0; i < nfiles; i++) {
-    for (int j=i+1; j < nfiles; j++) {
-      int percent = compare(sig[i], sig[j]);
-      if (percent >= thresh)
-        printf("%s and %s: %d%%\n", argv[i+optind], argv[j+optind], percent);
-    }
-  }
+  int percent = compare(&sig1, &sig2);
+  if (percent >= thresh)
+        printf("%s and %s: %d%%\n", fname1, fname2, percent);
 
   return 0;
 }
@@ -92,7 +79,7 @@ int hash_cmp(const hash_t *h1, const hash_t *h2)
   return 0;
 }
 
-sig_t *load(const char *file)
+void load(const char *file, sig_t *sig)
 {
   FILE *f;
   int nv, na;
@@ -133,15 +120,9 @@ sig_t *load(const char *file)
 
   qsort(v, nv, sizeof(v[0]), (int (*)(const void *, const void *))hash_cmp);
 
-  sig_t *sig = malloc(sizeof(sig_t));
-  if (sig == NULL) {
-    (void) fprintf(stderr, "%s: cannot allocate signature\n",
-        program_name);
-    exit(EXIT_FAILURE);
-  }
+  // assign result
   sig->nval = nv;
   sig->val = v;
-  return sig;
 }
 
 

@@ -33,6 +33,31 @@ At the time of writing, the similarity between csig.c and sig.c
 is reported as 34% with chainlength 5 and winnow 4.
 
 
+Deviations from the original sig and comp
+-----------------------------------------
+
+* `sig`
+  - plugged in a C lexer as frontend and using lexical token IDs as units
+  - using MD5 as hashing function (but only using 64 bits)
+  - implement winnowing instead of modulo 2^z as hash selection
+
+* `comp`
+  - The calculation of document resemblance is wrong, to be more precise:
+    if there is a common hash in both sets, it sums up the number
+    of occurences of this hash of both sets.
+    As a result, e.g. the hashes like 'a a a a b' and 'a b b b b' would
+    score 100% similarity.
+  - comp only accepts a pair of files as argument. It was tempting to
+    call comp within a `find ... -exec comp ...` command to perform an
+    n-to-n comparison. However, when hitting the ARG_MAX limit, comm would be
+    executed more than once with a subset of the files each time.
+    You can use the provided awk script allpairs.awk to create all pairs of a
+    list of files, like
+    ```bash
+    find ... | allpairs.awk | xargs -L1 comp -t 0
+    ```
+
+
 Contact: Daniel Prokesch
   daniel.prokesch (at) gmail.com
 

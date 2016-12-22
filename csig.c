@@ -3,7 +3,6 @@
  *
  *  This variant of fingerprinting uses a C lexer and winnowing.
  */
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -11,10 +10,7 @@
 
 #include <openssl/md5.h>
 
-#define DEFAULT_NTOKEN     5
-#define DEFAULT_WINNOWSIZE 4
-
-typedef uint64_t hash_t;
+#include "common.h"
 
 // we are using our generated scanner
 extern int yylex (void);
@@ -29,8 +25,6 @@ static int *tokenbuf; // buffer for tokens
 int hash_count; // number of hashes written
 FILE *outfile;
 
-void winnow(int w);
-
 const char *program_name = "csig";
 
 void usage(void)
@@ -42,6 +36,7 @@ void usage(void)
   exit(EXIT_FAILURE);
 }
 
+void winnow(int w);
 
 long int parse_num(const char *s)
 {
