@@ -22,8 +22,12 @@ int Winnowsize = DEFAULT_WINNOWSIZE;
 static int ntoken; // number of tokens read for current file
 static int *tokenbuf; // buffer for tokens
 
-int hash_count; // number of hashes written
+int hash_count; // number of hashes recorded
+int hash_buf_capacity;
+hash_t *hash_buf = NULL;
 FILE *outfile;
+
+
 
 const char *program_name = "csig";
 
@@ -108,6 +112,12 @@ int main(int argc, char *argv[])
 
   (void) free(tokenbuf);
 
+
+  // write the hashes to the outfile
+  // TODO sort
+  (void) fwrite(&hash_count, sizeof hash_count, 1, outfile);
+  (void) fwrite(hash_buf, sizeof(hash_t), hash_count, outfile);
+
   if (outfile != stdout)
     (void) fclose(outfile);
 
@@ -161,8 +171,17 @@ hash_t next_hash(void)
  */
 void record(hash_t h)
 {
-  (void) fprintf(outfile, "%0lx\n", h);
-  hash_count++;
+  if (hash_count == hash_buf_capacity) {
+    hash_buf_capacity += 100;
+    hash_t *new_buf = realloc(hash_buf, hash_buf_capacity*sizeof(hash_t));
+    if (new_buf == NULL) {
+      (void) fprintf(stderr, "%s: cannot allocate memory\n",
+          program_name);
+      exit(EXIT_FAILURE);
+    }
+    hash_buf = new_buf;
+  }
+  hash_buf[hash_count++] = h;
 }
 
 void winnow(int w) {

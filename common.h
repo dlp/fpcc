@@ -5,12 +5,6 @@
 
 typedef uint64_t hash_t;
 
-typedef struct {
-  unsigned nval; //  number of hashes
-  hash_t *val; // pointer to array of hashes
-} sig_t;
-
-
 // default options for csig
 #define DEFAULT_NTOKEN     5
 #define DEFAULT_WINNOWSIZE 4

@@ -9,6 +9,10 @@
 
 #include "common.h"
 
+typedef struct {
+  unsigned count; //  number of hashes
+  hash_t *hashes; // pointer to array of hashes
+} sig_t;
 
 
 int thresh = DEFAULT_THRESHOLD;
@@ -79,50 +83,44 @@ int hash_cmp(const hash_t *h1, const hash_t *h2)
   return 0;
 }
 
-void load(const char *file, sig_t *sig)
+void load(const char *fname, sig_t *sig)
 {
   FILE *f;
-  int nv, na;
-  hash_t *v, x;
-  char buf[512];
+  int hash_count;
+  hash_t *hash_buf;
 
-  f = fopen(file, "r");
+  f = fopen(fname, "r");
   if (f == NULL) {
-    (void) fprintf(stderr, "%s: can't open %s:", program_name, file);
+    (void) fprintf(stderr, "%s: can't open %s:", program_name, fname);
     perror(NULL);
     exit(EXIT_FAILURE);
   }
 
-  v = NULL;
-  na = 0;
-  nv = 0;
-  while (fgets(buf, sizeof buf, f) != NULL) {
-    char *p = NULL;
-    x = strtoul(buf, &p, 16);
-    if (p==NULL || p==buf){
-      (void) fprintf(stderr, "%s: bad signature file %s\n",
-          program_name, file);
-      exit(EXIT_FAILURE);
-    }
-    if (nv == na) {
-      na += 100;
-      hash_t *new_v = realloc(v, na*sizeof(hash_t));
-      if (new_v == NULL) {
-        (void) fprintf(stderr, "%s: cannot reallocate memory\n",
-            program_name);
-        exit(EXIT_FAILURE);
-      }
-      v = new_v;
-    }
-    v[nv++] = x;
+  int cnt = fread(&hash_count, sizeof hash_count, 1, f);
+  if (cnt != 1) {
+    (void) fprintf(stderr, "%s: error reading %s:", program_name, fname);
+    perror(NULL);
+    exit(EXIT_FAILURE);
+  }
+
+  hash_buf = malloc(hash_count * sizeof(hash_t));
+  if (hash_buf == NULL) {
+    (void) fprintf(stderr, "%s: can't allocate buffer", program_name);
+    exit(EXIT_FAILURE);
+  }
+  if (fread(hash_buf, sizeof(hash_t), hash_count, f) < hash_count) {
+    (void) fprintf(stderr, "%s: error reading %s:", program_name, fname);
+    perror(NULL);
+    exit(EXIT_FAILURE);
   }
   (void) fclose(f);
 
-  qsort(v, nv, sizeof(v[0]), (int (*)(const void *, const void *))hash_cmp);
+  qsort(hash_buf, hash_count, sizeof(hash_t),
+      (int (*)(const void *, const void *))hash_cmp);
 
   // assign result
-  sig->nval = nv;
-  sig->val = v;
+  sig->count = hash_count;
+  sig->hashes = hash_buf;
 }
 
 
@@ -130,20 +128,20 @@ int compare(sig_t *s0, sig_t *s1)
 {
   int i0=0, i1=0, nboth=0;
 
-  while (i0 < s0->nval || i1 < s1->nval) {
+  while (i0 < s0->count || i1 < s1->count) {
     int cmp = 0;
-    if (!(i0 < s0->nval)) {
+    if (!(i0 < s0->count)) {
       cmp = 1;
-    } else if (!(i1 < s1->nval)) {
+    } else if (!(i1 < s1->count)) {
       cmp = -1;
     } else {
-      cmp = hash_cmp(&s0->val[i0], &s1->val[i1]);
+      cmp = hash_cmp(&s0->hashes[i0], &s1->hashes[i1]);
     }
     if (cmp == 0) nboth++;
     if (cmp <= 0) i0++;
     if (cmp >= 0) i1++;
   }
   // similarity of A and B = intersect(A, B)/union(A, B)
-  return 100 * 2 * nboth / (s0->nval + s1->nval);
+  return 100 * 2 * nboth / (s0->count + s1->count);
 }
 
