@@ -5,6 +5,8 @@
 
 typedef uint64_t hash_t;
 
+int hash_cmp(const hash_t *h1, const hash_t *h2);
+
 // default options for csig
 #define DEFAULT_NTOKEN     5
 #define DEFAULT_WINNOWSIZE 4

@@ -114,7 +114,9 @@ int main(int argc, char *argv[])
 
 
   // write the hashes to the outfile
-  // TODO sort
+  qsort(hash_buf, hash_count, sizeof(hash_t),
+      (int (*)(const void *, const void *))hash_cmp);
+
   (void) fwrite(&hash_count, sizeof hash_count, 1, outfile);
   (void) fwrite(hash_buf, sizeof(hash_t), hash_count, outfile);
 

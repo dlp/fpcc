@@ -5,8 +5,6 @@ CC = gcc
 CFLAGS = -std=c99 -pedantic -Wall -D_XOPEN_SOURCE=500 -D_BSD_SOURCE -g
 LDFLAGS =
 
-OBJS =
-
 .PHONY: all clean
 
 all: csig comp
@@ -14,9 +12,7 @@ all: csig comp
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
 
-
 # rules related to csig
-
 lex.yy.o: lex.yy.c ccode.tab.h
 
 ccode.tab.c ccode.tab.h : ccode.y
@@ -26,16 +22,13 @@ lex.yy.c: ccode.lex
 	flex $<
 
 csig.o: common.h
-
 csig: LDLIBS = -lcrypto
-csig: csig.o lex.yy.o
-
+csig: csig.o lex.yy.o common.o
 
 # rules related to comp
-
 comp.o: common.h
-
-comp: comp.o
+common.o: common.h
+comp: comp.o common.o
 
 clean:
 	rm -f ccode.tab.{c,h} lex.yy.c *.o

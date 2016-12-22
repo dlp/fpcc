@@ -73,13 +73,9 @@ int main(int argc, char *argv[])
   if (percent >= thresh)
         printf("%s and %s: %d%%\n", fname1, fname2, percent);
 
-  return 0;
-}
+  free(sig1.hashes);
+  free(sig2.hashes);
 
-int hash_cmp(const hash_t *h1, const hash_t *h2)
-{
-  if (*h1 < *h2) return -1;
-  if (*h1 > *h2) return 1;
   return 0;
 }
 
@@ -114,9 +110,6 @@ void load(const char *fname, sig_t *sig)
     exit(EXIT_FAILURE);
   }
   (void) fclose(f);
-
-  qsort(hash_buf, hash_count, sizeof(hash_t),
-      (int (*)(const void *, const void *))hash_cmp);
 
   // assign result
   sig->count = hash_count;

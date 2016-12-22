@@ -56,6 +56,9 @@ Deviations from the original sig and comp
     ```bash
     find ... | allpairs.awk | xargs -L1 comp -t 0
     ```
+* both:
+  - they read and write binary data
+  - sorting is moved from comp to sig, performed before writing
 
 
 Contact: Daniel Prokesch
