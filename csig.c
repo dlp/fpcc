@@ -3,6 +3,7 @@
  *
  *  This variant of fingerprinting uses a C lexer and winnowing.
  */
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -76,7 +77,8 @@ int main(int argc, char *argv[])
         if (opt_o++ > 0) usage();
         outfile = fopen(optarg, "w");
         if (outfile == NULL) {
-          perror("opening outfile");
+          (void) fprintf(stderr, "%s: cannot open outfile %s: %s\n",
+              program_name, optarg, strerror(errno));
           exit(EXIT_FAILURE);
         }
         break;
@@ -91,7 +93,7 @@ int main(int argc, char *argv[])
   // allocate k-gram buffer
   tokenbuf = malloc(Ntoken * sizeof(int));
   if (tokenbuf == NULL) {
-    (void) fprintf(stderr, "%s: can't allocate buffer", program_name);
+    (void) fprintf(stderr, "%s: cannot allocate buffer\n", program_name);
     exit(EXIT_FAILURE);
   }
 
@@ -100,12 +102,10 @@ int main(int argc, char *argv[])
     yyin = fopen(argv[i], "r");
     if (yyin == NULL) {
       (void) fprintf(stderr,
-          "%s: can't open %s:", program_name, argv[i]);
-      perror(NULL);
+          "%s: cannot open %s: %s\n", program_name, argv[i], strerror(errno));
       continue;
     }
     ntoken = 0;
-    hash_count = 0;
     winnow(Winnowsize); // main winnowing routine
     (void) fclose(yyin);
   }
