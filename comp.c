@@ -16,13 +16,13 @@ typedef struct {
   hash_t *hashes; // pointer to array of hashes
 } sig_t;
 
-
 int thresh = DEFAULT_THRESHOLD;
 
 const char *program_name = "comp";
 
-void load(const char *);
-int compare(sig_t *, sig_t *);
+sig_t *new_sig(void);
+void load(const char *, sig_t *);
+int compare(sig_t *, sig_t *, sig_t *);
 
 
 // the global list of document's fingerprints
@@ -30,15 +30,14 @@ int compare(sig_t *, sig_t *);
 static sig_t *siglist;
 static int sl_cnt=0, sl_cap=0;
 
-
-
 void usage(void)
 {
-  (void) fprintf(stderr, "USAGE: %s [-t threshold] sigfile1 sigfile2\n",
+  (void) fprintf(stderr,
+      "USAGE: %s [-b basefile] [-t threshold] sigfile1 sigfile2\n",
       program_name);
-  (void) fprintf(stderr, "USAGE: %s [-t threshold] [-L filelist]\n",
+  (void) fprintf(stderr,
+      "USAGE: %s [-b basefile] [-t threshold] [-L filelist]\n",
       program_name);
-  (void) fprintf(stderr, "  defaults: threshold=%d\n", DEFAULT_THRESHOLD);
   exit(EXIT_FAILURE);
 }
 
@@ -54,12 +53,17 @@ long int parse_num(const char *s)
 
 int main(int argc, char *argv[])
 {
-  int opt_t=0, opt_L=0;
+  int opt_b=0, opt_t=0, opt_L=0;
   const char *filelist = NULL;
+  char *basefile = NULL;
 
   int c;
-  while ((c = getopt(argc, argv, "t:L:")) != -1) {
+  while ((c = getopt(argc, argv, "b:t:L:")) != -1) {
     switch (c) {
+      case 'b':
+        if (opt_b++ > 0) usage();
+        basefile = optarg;
+        break;
       case 't':
         if (opt_t++ > 0) usage();
         thresh = parse_num(optarg);
@@ -77,6 +81,12 @@ int main(int argc, char *argv[])
   }
   int npargs = argc - optind;
 
+  sig_t basesig = {.fname=NULL, .count=0, .hashes=NULL};
+
+  if (basefile != NULL) {
+    load(basefile, &basesig);
+  }
+
   if (filelist != NULL) {
     // reading the signatures from a file containing a list of files,
     // one line each
@@ -90,7 +100,7 @@ int main(int argc, char *argv[])
     char line[LINE_MAX];
     while (fgets(line, LINE_MAX, f) != NULL) {
       line[strcspn(line, "\r\n")] = '\0';
-      load(line);
+      load(line, new_sig());
     }
     if (ferror(f) != 0) {
       (void) fprintf(stderr, "%s: error reading %s: %s\n",
@@ -100,8 +110,8 @@ int main(int argc, char *argv[])
   } else {
     // comparing two files only
     if (npargs != 2) usage();
-    load(argv[optind]);
-    load(argv[optind + 1]);
+    load(argv[optind], new_sig());
+    load(argv[optind + 1], new_sig());
   }
 
   // emit a warning
@@ -111,7 +121,7 @@ int main(int argc, char *argv[])
 
   for (int i=0; i < sl_cnt; i++) {
     for (int j=i+1; j < sl_cnt; j++) {
-      int percent = compare(&siglist[i], &siglist[j]);
+      int percent = compare(&siglist[i], &siglist[j], &basesig);
       if (percent >= thresh) {
         printf("%s and %s: %d%%\n",
             siglist[i].fname, siglist[j].fname, percent);
@@ -128,10 +138,31 @@ int main(int argc, char *argv[])
   // free the list itself
   free(siglist);
 
+  // free the hashes of the basefile
+  free(basesig.fname);
+  free(basesig.hashes);
+
   return 0;
 }
 
-void load(const char *fname)
+sig_t *new_sig(void)
+{
+  // append to global list
+  if (sl_cnt == sl_cap) {
+    sl_cap += 100;
+    sig_t *newlist = realloc(siglist, sl_cap*sizeof(sig_t));
+    if (newlist == NULL) {
+      (void) fprintf(stderr, "%s: cannot allocate memory\n",
+          program_name);
+      exit(EXIT_FAILURE);
+    }
+    siglist = newlist;
+  }
+  return &siglist[sl_cnt++];
+}
+
+
+void load(const char *fname, sig_t *sig)
 {
   FILE *f;
   int hash_count;
@@ -164,27 +195,15 @@ void load(const char *fname)
   }
   (void) fclose(f);
 
-  // append to global list
-  if (sl_cnt == sl_cap) {
-    sl_cap += 100;
-    sig_t *newlist = realloc(siglist, sl_cap*sizeof(sig_t));
-    if (newlist == NULL) {
-      (void) fprintf(stderr, "%s: cannot allocate memory\n",
-          program_name);
-      exit(EXIT_FAILURE);
-    }
-    siglist = newlist;
-  }
-  sig_t *sig = &siglist[sl_cnt++];
   sig->fname = strdup(fname);
   sig->count = hash_count;
   sig->hashes = hash_buf;
 }
 
 
-int compare(sig_t *s0, sig_t *s1)
+int compare(sig_t *s0, sig_t *s1, sig_t *sb)
 {
-  int i0=0, i1=0, nboth=0;
+  int i0=0, i1=0, ib=0, nboth=0, nexcl=0;
 
   while (i0 < s0->count || i1 < s1->count) {
     int cmp = 0;
@@ -195,11 +214,29 @@ int compare(sig_t *s0, sig_t *s1)
     } else {
       cmp = hash_cmp(&s0->hashes[i0], &s1->hashes[i1]);
     }
-    if (cmp == 0) nboth++;
+    if (cmp == 0) {
+      nboth++;
+      // check against the base file
+      while (ib < sb->count && sb->hashes[ib] < s0->hashes[i0]) ib++;
+      if (ib < sb->count && sb->hashes[ib] == s0->hashes[i0]) {
+        nexcl++;
+        ib++;
+      }
+    }
     if (cmp <= 0) i0++;
     if (cmp >= 0) i1++;
   }
-  // similarity of A and B = intersect(A, B)/union(A, B)
-  return 100 * 2 * nboth / (s0->count + s1->count);
+
+  // invariant: nexcl <= sX->count
+  // therefore, following only holds if s0 == s1 == sb
+  if (s0->count + s1->count == 2 * nexcl) {
+    // per definition; think as limit, when the base part -> whole file
+    return 100;
+  }
+  // similarity/resemblance of A,B:
+  // r(A, B) = |(A n B)\C| / |(A u B)\C|
+  // We assume multisets:
+  // {x,y} u {x,z} = {x,x,y,z} => |A u B| = |A| + |B|
+  return 100 * 2*(nboth - nexcl) / (s0->count + s1->count - 2*nexcl);
 }
 
