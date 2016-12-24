@@ -165,7 +165,7 @@ sig_t *new_sig(void)
 void load(const char *fname, sig_t *sig)
 {
   FILE *f;
-  int hash_count;
+  uint32_t hash_count;
   hash_t *hash_buf;
 
   f = fopen(fname, "r");

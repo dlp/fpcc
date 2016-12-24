@@ -23,7 +23,7 @@ int Winnowsize = DEFAULT_WINNOWSIZE;
 static int ntoken; // number of tokens read for current file
 static int *tokenbuf; // buffer for tokens
 
-int hash_count; // number of hashes recorded
+uint32_t hash_count; // number of hashes recorded
 int hash_buf_capacity;
 hash_t *hash_buf = NULL;
 FILE *outfile;
@@ -111,7 +111,6 @@ int main(int argc, char *argv[])
   }
 
   (void) free(tokenbuf);
-
 
   // write the hashes to the outfile
   qsort(hash_buf, hash_count, sizeof(hash_t),
