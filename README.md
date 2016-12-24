@@ -41,8 +41,8 @@ Usage
   csig [-n chainlength] [-w winnow] [-o outfile] file...
     defaults: chainlength=5 winnow=4
 
-  comp [-t threshold] sigfile1 sigfile2
-  comp [-t threshold] [-L filelist]
+  comp [-b basefile] [-t threshold] sigfile1 sigfile2
+  comp [-b basefile] [-t threshold] [-L filelist]
     defaults: threshold=0
   ```
 
