@@ -1,5 +1,5 @@
 /**
- * comp.c - compare two fingerprints produced by csig
+ * comp.c - compare fingerprints produced by csig
  */
 
 #include <errno.h>
@@ -53,17 +53,19 @@ long int parse_num(const char *s)
 
 int main(int argc, char *argv[])
 {
-  int opt_b=0, opt_t=0, opt_L=0;
+  int opt_b=0, opt_t=0, opt_L=0, opt_c=0;
   const char *filelist = NULL;
   char *basefile = NULL;
 
   int c;
-  while ((c = getopt(argc, argv, "b:t:L:")) != -1) {
+  while ((c = getopt(argc, argv, "b:ct:L:")) != -1) {
     switch (c) {
       case 'b':
         if (opt_b++ > 0) usage();
         basefile = optarg;
         break;
+      case 'c':
+        if (opt_c++ > 0) usage();
       case 't':
         if (opt_t++ > 0) usage();
         thresh = parse_num(optarg);
@@ -119,12 +121,21 @@ int main(int argc, char *argv[])
     (void) fprintf(stderr, "%s: nothing to compare\n", program_name);
   }
 
+  const char *outfmt;
+  if (opt_c > 0) {
+    outfmt = "%s and %s: %d%%\n";
+  } else {
+    outfmt = "%s;%s;%d\n";
+  }
+
   for (int i=0; i < sl_cnt; i++) {
     for (int j=i+1; j < sl_cnt; j++) {
       int percent = compare(&siglist[i], &siglist[j], &basesig);
       if (percent >= thresh) {
-        printf("%s and %s: %d%%\n",
-            siglist[i].fname, siglist[j].fname, percent);
+        if (printf(outfmt, siglist[i].fname, siglist[j].fname, percent) < 0) {
+          (void) fprintf(stderr, "%s: cannot print result: %s\n",
+              program_name, strerror(errno));
+        }
       }
     }
   }
