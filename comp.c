@@ -33,10 +33,10 @@ static int sl_cnt=0, sl_cap=0;
 void usage(void)
 {
   (void) fprintf(stderr,
-      "USAGE: %s [-b basefile] [-t threshold] sigfile1 sigfile2\n",
+      "USAGE: %s [-b basefile] [-c] [-t threshold] sigfile1 sigfile2\n",
       program_name);
   (void) fprintf(stderr,
-      "USAGE: %s [-b basefile] [-t threshold] [-L filelist]\n",
+      "USAGE: %s [-b basefile] [-c] [-t threshold] [-L filelist]\n",
       program_name);
   exit(EXIT_FAILURE);
 }
@@ -66,6 +66,7 @@ int main(int argc, char *argv[])
         break;
       case 'c':
         if (opt_c++ > 0) usage();
+        break;
       case 't':
         if (opt_t++ > 0) usage();
         thresh = parse_num(optarg);
@@ -123,9 +124,9 @@ int main(int argc, char *argv[])
 
   const char *outfmt;
   if (opt_c > 0) {
-    outfmt = "%s and %s: %d%%\n";
-  } else {
     outfmt = "%s;%s;%d\n";
+  } else {
+    outfmt = "%s and %s: %d%%\n";
   }
 
   for (int i=0; i < sl_cnt; i++) {
