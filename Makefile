@@ -7,12 +7,14 @@ LDFLAGS =
 
 .PHONY: all clean
 
-all: csig comp
+all: fpcc-sig fpcc-comp
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
 
-# rules related to csig
+common.o: common.h
+
+# rules related to fpcc-sig
 lex.yy.o: lex.yy.c ccode.tab.h
 
 ccode.tab.c ccode.tab.h : ccode.y
@@ -21,15 +23,16 @@ ccode.tab.c ccode.tab.h : ccode.y
 lex.yy.c: ccode.lex
 	flex $<
 
-csig.o: common.h
-csig: LDLIBS = -lcrypto
-csig: csig.o lex.yy.o common.o
+fpcc-sig.o: common.h
+fpcc-sig: LDLIBS = -lcrypto
+fpcc-sig: fpcc-sig.o lex.yy.o common.o
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-# rules related to comp
-comp.o: common.h
-common.o: common.h
-comp: comp.o common.o
+# rules related to fpcc-comp
+fpcc-comp.o: common.h
+fpcc-comp: fpcc-comp.o common.o
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 clean:
 	rm -f ccode.tab.{c,h} lex.yy.c *.o
-	rm -f csig comp
+	rm -f fpcc-sig fpcc-comp

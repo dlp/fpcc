@@ -14,9 +14,10 @@ As frontend/preprocessor, a C lexer is used, based on a freely available
 defined by the yacc spec. This way, variable names, literal values, formatting,
 etc is ignored. The scanner also ignores comments and preprocessor directives.
 The set of hashes that comprises the fingerprint is selected based on
-[winnowing][3].
+winnowing, as described by [Schleimer, Wilkerson, Aiken, "Winnowing: Local
+Algorithms for Document Fingerprinting"][3].
 Another earlier paper by [Andrei Broder, "On the resemblance and containment
-of documents"][4] gives more background on
+of documents"][4] gives additional background on
 document fingerprinting.
 
 
@@ -38,34 +39,54 @@ Usage
   ```
   SYNOPSIS
 
-  csig [-n chainlength] [-w winnow] [-o outfile] file...
+  fpcc-sig [-n chainlength] [-w winnow] [-o outfile] file...
     defaults: chainlength=5 winnow=4
 
-  comp [-b basefile] [-t threshold] sigfile1 sigfile2
-  comp [-b basefile] [-t threshold] [-L filelist]
+  fpcc-comp [-b basefile] [-c] [-t threshold] sigfile1 sigfile2
+  fpcc-comp [-b basefile] [-c] [-t threshold] [-L filelist]
     defaults: threshold=0
   ```
 
-Options: tbd
+`fpcc-sig` takes one or more C source files and computes hashes
+(= a fingerprint) from their concatenation.
+
+fpcc-comp compares the specified fingerprints and reports a quantitative
+similarity.
+
+Options:
+
+-n chainlength ... number of tokens to form n-grams
+-w winnow ... window size of the winnowing algorithm
+-o outfile ... write to specified file instead of stdout
+
+-b basefile ... the fingerprint of which hashes are ignored
+-c ... output comparison results in a csv-format file1;file2;percent, where
+       percent is in the range from 0 to 100.
+-t threshold ... suppress reporting below the specified threshold
+-L filelist ... path to a file containing the list of files to compare to
+                each other, Each path must be on a separate line.
+
+Howto
+-----
 
 1. Create fingerprints for each source file you want to compare:
    ```bash
-   $ ./csig -o mycfile1.sig mycfile1.c
-   $ ./csig -o mycfile2.sig mycfile2.c
+   $ ./fpcc-sig -o mycfile1.sig mycfile1.c
+   $ ./fpcc-sig -o mycfile2.sig mycfile2.c
    ```
 2. Compare the fingerprints:
    ```bash
-   $ ./comp mycfile1.sig mycfile2.sig
+   $ ./fpcc-comp mycfile1.sig mycfile2.sig
    mycfile1.sig and mycfile2.sig: 34%
    ```
    You can also generate a list of signature files to perform an n-to-n
    comparison:
    ```bash
-   $ ./csig -o mycfile3.sig mycfile2.c # a copy
+   $ ./fpcc-sig -o mycfile3.sig mycfile2.c # a copy
    $ echo mycfile1.sig > mylist.txt
    $ echo mycfile2.sig >> mylist.txt
    $ echo mycfile3.sig >> mylist.txt
-   $ ./comp -L mylist.txt
+   $ ./fpcc-comp -L mylist.txt
    mycfile1.sig and mycfile2.sig: 34%
    mycfile1.sig and mycfile3.sig: 34%
    mycfile2.sig and mycfile3.sig: 100%
@@ -91,7 +112,7 @@ Deviations from the original sig and comp
 -----------------------------------------
 
 I started with the idea to take the original programs and simply plug in
-a C lexer as frontend. However, the changes accumulated and I ended
+a C lexer as frontend. However, the changes accumulated and I ended up
 rewriting the tools almost completely.
 Following changes were made:
 
@@ -101,7 +122,7 @@ Following changes were made:
   - implement winnowing instead of modulo 2^z as hash selection
 
 * `comp`
-  - The calculation of document resemblance is wrong, to be more precise: if
+  - The calculation of document resemblance was wrong, to be more precise: if
     there is a common hash in both sets, it sums up the number of occurences of
     this hash of both sets.  As a result, e.g. the hashes like 'a a a a b' and
     'a b b b b' would score 100% similarity. Btw, this bug persists in
@@ -111,14 +132,18 @@ Following changes were made:
     within a `find ... -exec comp ...` command to perform an n-to-n comparison.
     However, when hitting the ARG_MAX limit, comm would be executed more than
     once with a subset of the files each time.
+  - added option to ignore a set of "base hashes"
 
 * both:
   - they read and write binary data
   - sorting is moved from comp to sig, performed before writing
 
+---
 
 Contact: Daniel Prokesch
   daniel.prokesch (at) gmail.com
+
+---
 
 [1]: http://www.cs.usyd.edu.au/~scilect/sherlock/
 [2]: http://www.quut.com/c/ANSI-C-grammar-l-2011.html

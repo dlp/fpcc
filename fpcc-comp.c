@@ -1,5 +1,7 @@
 /**
- * comp.c - compare fingerprints produced by csig
+ * fpcc-comp.c - Compare fingerprints produced by fpcc-sig
+ *
+ * Author: Daniel Prokesch <daniel.prokesch@gmail.com>
  */
 
 #include <errno.h>
@@ -18,7 +20,7 @@ typedef struct {
 
 int thresh = DEFAULT_THRESHOLD;
 
-const char *program_name = "comp";
+const char *program_name = "fpcc-comp";
 
 sig_t *new_sig(void);
 void load(const char *, sig_t *);

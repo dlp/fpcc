@@ -1,7 +1,9 @@
 /**
- *  csig.c - based on sig.c written by Rob Pike
+ * fpcc-sig - Create fingerprints from C source files.
  *
- *  This variant of fingerprinting uses a C lexer and winnowing.
+ * This variant of fingerprinting uses a C lexer and winnowing.
+ *
+ * Author: Daniel Prokesch <daniel.prokesch@gmail.com>
  */
 #include <errno.h>
 #include <stdlib.h>
@@ -28,9 +30,7 @@ int hash_buf_capacity;
 hash_t *hash_buf = NULL;
 FILE *outfile;
 
-
-
-const char *program_name = "csig";
+const char *program_name = "fpcc-sig";
 
 void usage(void)
 {
