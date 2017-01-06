@@ -98,8 +98,8 @@ Credits
 
 `sig` and `comp` can be found on a [website][1] that offers `sherlock`,
 which combined and slightly modified the both tools.
-The author calls himself "Loki"; I couldn't find any contact information nor
-the tools elsewhere on the web.
+The author seems to be Lachlan "Loki" Patrick; however, the tools seem to be
+unmaintained for a long time.
 
 
 License
