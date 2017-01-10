@@ -24,14 +24,16 @@ const char *program_name = "fpcc-comp";
 
 sig_t *new_sig(void);
 void load(const char *, sig_t *);
-int compare(sig_t *, sig_t *, sig_t *);
-
+void count(int *, int *, sig_t *, sig_t *, sig_t *);
 
 // the global list of document's fingerprints
 // - a dynamically growing array
 static sig_t *siglist;
 static int sl_cnt=0, sl_cap=0;
 
+/**
+ * Print a usage message to stderr and exit with EXIT_FAILURE.
+ */
 void usage(void)
 {
   (void) fprintf(stderr,
@@ -43,6 +45,38 @@ void usage(void)
   exit(EXIT_FAILURE);
 }
 
+
+/**
+ * Compute the Resemblance of A and B:
+ * r(A, B) = |(A n B)\C| / |(A u B)\C|
+ */
+inline static int resemblance(int na, int nb, int nboth, int nexcl)
+{
+  // invariant: nexcl <= nX
+  // therefore, following only holds if nA == nB == nexcl
+  if (na + nb == 2 * nexcl) {
+    // per definition; think as limit, when the base part -> whole file
+    return 100;
+  } else {
+    // We assume multisets:
+    // {x,y} u {x,z} = {x,x,y,z} => |A u B| = |A| + |B|
+    return 100 * 2*(nboth - nexcl) / (na + nb - 2*nexcl);
+  }
+}
+
+/**
+ * Compute the Containment of A in B:
+ * c(A, B) = |(A n B)\C| / |A\C|
+ */
+inline static int containment(int na, int nboth, int nexcl)
+{
+  if (na != nexcl) {
+    return 100 * (nboth - nexcl) / (na - nexcl);
+  }
+  return 0;
+}
+
+
 long int parse_num(const char *s)
 {
   char *eptr;
@@ -52,6 +86,7 @@ long int parse_num(const char *s)
   if (*eptr != '\0') usage();
   return res;
 }
+
 
 int main(int argc, char *argv[])
 {
@@ -133,9 +168,11 @@ int main(int argc, char *argv[])
 
   for (int i=0; i < sl_cnt; i++) {
     for (int j=i+1; j < sl_cnt; j++) {
-      int percent = compare(&siglist[i], &siglist[j], &basesig);
-      if (percent >= thresh) {
-        if (printf(outfmt, siglist[i].fname, siglist[j].fname, percent) < 0) {
+      int nboth, nexcl, res;
+      count(&nboth, &nexcl, &siglist[i], &siglist[j], &basesig);
+      res = resemblance(siglist[i].count, siglist[j].count, nboth, nexcl);
+      if (res >= thresh) {
+        if (printf(outfmt, siglist[i].fname, siglist[j].fname, res) < 0) {
           (void) fprintf(stderr, "%s: cannot print result: %s\n",
               program_name, strerror(errno));
         }
@@ -158,6 +195,7 @@ int main(int argc, char *argv[])
 
   return 0;
 }
+
 
 sig_t *new_sig(void)
 {
@@ -214,11 +252,14 @@ void load(const char *fname, sig_t *sig)
   sig->hashes = hash_buf;
 }
 
-
-int compare(sig_t *s0, sig_t *s1, sig_t *sb)
+/**
+ * Given two fingerprints s0 and s1, count the number of common
+ * fingerprints (nboth) and the number of common fingerprints that need to be
+ * excluded because they appear in sb (nexcl).
+ */
+void count(int *nboth, int *nexcl, sig_t *s0, sig_t *s1, sig_t *sb)
 {
-  int i0=0, i1=0, ib=0, nboth=0, nexcl=0;
-
+  int i0=0, i1=0, ib=0, lboth=0, lexcl=0;
   while (i0 < s0->count || i1 < s1->count) {
     int cmp = 0;
     if (!(i0 < s0->count)) {
@@ -229,28 +270,17 @@ int compare(sig_t *s0, sig_t *s1, sig_t *sb)
       cmp = hash_cmp(&s0->hashes[i0], &s1->hashes[i1]);
     }
     if (cmp == 0) {
-      nboth++;
+      lboth++;
       // check against the base file
       while (ib < sb->count && sb->hashes[ib] < s0->hashes[i0]) ib++;
       if (ib < sb->count && sb->hashes[ib] == s0->hashes[i0]) {
-        nexcl++;
+        lexcl++;
         ib++;
       }
     }
     if (cmp <= 0) i0++;
     if (cmp >= 0) i1++;
   }
-
-  // invariant: nexcl <= sX->count
-  // therefore, following only holds if s0 == s1 == sb
-  if (s0->count + s1->count == 2 * nexcl) {
-    // per definition; think as limit, when the base part -> whole file
-    return 100;
-  }
-  // similarity/resemblance of A,B:
-  // r(A, B) = |(A n B)\C| / |(A u B)\C|
-  // We assume multisets:
-  // {x,y} u {x,z} = {x,x,y,z} => |A u B| = |A| + |B|
-  return 100 * 2*(nboth - nexcl) / (s0->count + s1->count - 2*nexcl);
+  *nboth = lboth;
+  *nexcl = lexcl;
 }
-
