@@ -37,10 +37,10 @@ static int sl_cnt=0, sl_cap=0;
 void usage(void)
 {
   (void) fprintf(stderr,
-      "USAGE: %s [-b basefile] [-c] [-t threshold] sigfile1 sigfile2\n",
+      "USAGE: %s [-b basefile] [-c|-i] [-t threshold] sigfile1 sigfile2\n",
       program_name);
   (void) fprintf(stderr,
-      "USAGE: %s [-b basefile] [-c] [-t threshold] [-L filelist]\n",
+      "USAGE: %s [-b basefile] [-c|-i] [-t threshold] [-L filelist]\n",
       program_name);
   exit(EXIT_FAILURE);
 }
@@ -88,14 +88,27 @@ long int parse_num(const char *s)
 }
 
 
+void print_if_threshold(const char *join,
+    const char *fname1, const char *fname2,
+    int value, int threshold)
+{
+  if (value >= threshold) {
+    if (printf("%s %s %s: %d%%\n", fname1, join, fname2, value) < 0) {
+      (void) fprintf(stderr, "%s: cannot print result: %s\n",
+          program_name, strerror(errno));
+    }
+  }
+}
+
+
 int main(int argc, char *argv[])
 {
-  int opt_b=0, opt_t=0, opt_L=0, opt_c=0;
+  int opt_b=0, opt_t=0, opt_L=0, opt_c=0, opt_i=0;
   const char *filelist = NULL;
   char *basefile = NULL;
 
   int c;
-  while ((c = getopt(argc, argv, "b:ct:L:")) != -1) {
+  while ((c = getopt(argc, argv, "b:cit:L:")) != -1) {
     switch (c) {
       case 'b':
         if (opt_b++ > 0) usage();
@@ -103,6 +116,9 @@ int main(int argc, char *argv[])
         break;
       case 'c':
         if (opt_c++ > 0) usage();
+        break;
+      case 'i':
+        if (opt_i++ > 0) usage();
         break;
       case 't':
         if (opt_t++ > 0) usage();
@@ -119,6 +135,8 @@ int main(int argc, char *argv[])
         usage();
     }
   }
+  if (opt_c + opt_i > 1) usage();
+
   int npargs = argc - optind;
 
   sig_t basesig = {.fname=NULL, .count=0, .hashes=NULL};
@@ -159,24 +177,38 @@ int main(int argc, char *argv[])
     (void) fprintf(stderr, "%s: nothing to compare\n", program_name);
   }
 
-  const char *outfmt;
-  if (opt_c > 0) {
-    outfmt = "%s;%s;%d\n";
-  } else {
-    outfmt = "%s and %s: %d%%\n";
-  }
-
   for (int i=0; i < sl_cnt; i++) {
     for (int j=i+1; j < sl_cnt; j++) {
-      int nboth, nexcl, res;
+      int nboth, nexcl;
       count(&nboth, &nexcl, &siglist[i], &siglist[j], &basesig);
-      res = resemblance(siglist[i].count, siglist[j].count, nboth, nexcl);
-      if (res >= thresh) {
-        if (printf(outfmt, siglist[i].fname, siglist[j].fname, res) < 0) {
-          (void) fprintf(stderr, "%s: cannot print result: %s\n",
-              program_name, strerror(errno));
+
+      if (opt_c > 0) {
+        // csv-format output all three
+        int rb = resemblance(siglist[i].count, siglist[j].count, nboth, nexcl);
+        int ct1 = containment(siglist[i].count, nboth, nexcl);
+        int ct2 = containment(siglist[j].count, nboth, nexcl);
+        if (rb >= thresh || ct1 >= thresh || ct2 >= thresh) {
+          if (printf("%s;%s;%d;%d;%d\n",
+                siglist[i].fname, siglist[j].fname, rb, ct1, ct2) < 0) {
+            (void) fprintf(stderr, "%s: cannot print result: %s\n",
+                program_name, strerror(errno));
+          }
         }
-      }
+      } else {
+        // conventional output
+        if (opt_i > 0) {
+          // print containment
+          print_if_threshold("in", siglist[i].fname, siglist[j].fname,
+              containment(siglist[i].count, nboth, nexcl), thresh);
+          print_if_threshold("in", siglist[j].fname, siglist[i].fname,
+              containment(siglist[j].count, nboth, nexcl), thresh);
+        } else {
+          // print resemblance
+          print_if_threshold("and", siglist[j].fname, siglist[i].fname,
+              resemblance(siglist[i].count, siglist[j].count, nboth, nexcl),
+              thresh);
+        } // end if conventional output
+      } // end if csv-format
     }
   }
 

@@ -42,8 +42,8 @@ Usage
   fpcc-sig [-n chainlength] [-w winnow] [-o outfile] file...
     defaults: chainlength=5 winnow=4
 
-  fpcc-comp [-b basefile] [-c] [-t threshold] sigfile1 sigfile2
-  fpcc-comp [-b basefile] [-c] [-t threshold] [-L filelist]
+  fpcc-comp [-b basefile] [-c|-i] [-t threshold] sigfile1 sigfile2
+  fpcc-comp [-b basefile] [-c|-i] [-t threshold] [-L filelist]
     defaults: threshold=0
   ```
 
@@ -60,14 +60,21 @@ Options:
 -o outfile ... write to specified file instead of stdout
 
 -b basefile ... the fingerprint of which hashes are ignored
--c ... output comparison results in a csv-format file1;file2;percent, where
-       percent is in the range from 0 to 100.
+-c ... output comparison results in a csv-format file1;file2;rb;ct1;ct2, where
+       rb is resemblance of the two documents
+       ct1 is containment of file1 in file2
+       ct2 is containment of file2 in file1
+       rb,ct1,ct2 are in the range from 0 to 100.
+-i ... compute containment instead of resemblance
+       (in csv format, both resemblance and containment are always computed)
 -t threshold ... suppress reporting below the specified threshold
 -L filelist ... path to a file containing the list of files to compare to
                 each other, Each path must be on a separate line.
 
 Howto
 -----
+
+Assume you want to compute resemblance of documents.
 
 1. Create fingerprints for each source file you want to compare:
    ```bash
