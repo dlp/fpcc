@@ -38,7 +38,7 @@ WS  [ \t\v\n\f]
 "/*"                                    { BEGIN(COMMENT); }
 <COMMENT>[^*]*                          /* eat anything that's not a '*' */
 <COMMENT>"*"+[^*/]*                     /* eat up '*'s not followed by '/'s */
-<COMMENT>"*/"                           { BEGIN(INITIAL); }
+<COMMENT>"*"+"/"                        { BEGIN(INITIAL); }
 
 "//".*                                  { /* consume //-comment */ }
 "#".*                                   { /* return PREPROC; */ }

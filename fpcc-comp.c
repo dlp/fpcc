@@ -52,16 +52,19 @@ void usage(void)
  */
 inline static int resemblance(int na, int nb, int nboth, int nexcl)
 {
-  // invariant: nexcl <= nX
-  // therefore, following only holds if nA == nB == nexcl
-  if (na + nb == 2 * nexcl) {
-    // per definition; think as limit, when the base part -> whole file
-    return 100;
-  } else {
-    // We assume multisets:
-    // {x,y} u {x,z} = {x,x,y,z} => |A u B| = |A| + |B|
-    return 100 * 2*(nboth - nexcl) / (na + nb - 2*nexcl);
+  if (na > 0 || nb > 0) {
+    // invariant: nexcl <= nX
+    // therefore, following only holds if nA == nB == nexcl
+    if (na + nb == 2 * nexcl) {
+      // per definition; think as limit, when the base part -> whole file
+      return 100;
+    } else {
+      // We assume multisets:
+      // {x,y} u {x,z} = {x,x,y,z} => |A u B| = |A| + |B|
+      return 100 * 2*(nboth - nexcl) / (na + nb - 2*nexcl);
+    }
   }
+  return 0;
 }
 
 /**
