@@ -135,8 +135,9 @@ hash_t hash(void)
   } result;
 
   MD5_Init(&md5);
-  for (int i=0; i < Ntoken; i++) {
-    MD5_Update(&md5, &tokenbuf[i], sizeof tokenbuf[i]);
+  for (int i=0, j=ntoken; i < Ntoken; i++) {
+    // for hashing, we start at the most recent value and work backwards
+    MD5_Update(&md5, &tokenbuf[--j % Ntoken], sizeof tokenbuf[0]);
   }
   MD5_Final(result.digest, &md5);
   return result.h;
@@ -153,14 +154,9 @@ hash_t next_hash(void)
 {
   int tok;
   while ((tok = yylex()) != 0) {
-    // shift chain-window
-    for (int i = Ntoken; --i > 0; )
-      tokenbuf[i] = tokenbuf[i-1];
-    tokenbuf[0] = tok;
-
+    tokenbuf[ntoken % Ntoken] = tok;
     // fill the first chain
     if (++ntoken < Ntoken) continue;
-
     return hash();
   }
   return 0;
