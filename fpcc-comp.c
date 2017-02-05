@@ -5,6 +5,7 @@
  */
 
 #include <errno.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -280,6 +281,14 @@ void load(const char *fname, sig_t *sig)
         program_name, fname, strerror(errno));
     exit(EXIT_FAILURE);
   }
+
+
+  // while ((cnt = fread(&hash_buf[hash_count],
+  //     sizeof(hash_t), CHUNK_SIZE, f)) > 0) {
+  //   
+  //   hash_count += cnt;
+  // }
+
   (void) fclose(f);
 
   sig->fname = strdup(fname);

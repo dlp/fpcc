@@ -6,18 +6,19 @@
  * Author: Daniel Prokesch <daniel.prokesch@gmail.com>
  */
 #include <errno.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
 
 #include <openssl/md5.h>
-
 #include "common.h"
 
 // we are using our generated scanner
 extern int yylex (void);
 extern FILE *yyin;
+extern int yylineno;
 
 int Ntoken     = DEFAULT_NTOKEN;
 int Winnowsize = DEFAULT_WINNOWSIZE;
@@ -25,23 +26,27 @@ int Winnowsize = DEFAULT_WINNOWSIZE;
 static int ntoken; // number of tokens read for current file
 static int *tokenbuf; // buffer for tokens
 
-uint32_t hash_count; // number of hashes recorded
-int hash_buf_capacity;
-hash_t *hash_buf = NULL;
-FILE *outfile;
-
 const char *program_name = "fpcc-sig";
+
+void winnow(int w);
+
 
 void usage(void)
 {
   (void) fprintf(stderr, "USAGE: %s [-n chainlength] [-w winnow]"
-                         " [-o outfile] file...\n", program_name);
+                         " file...\n", program_name);
   (void) fprintf(stderr, "  defaults: chainlength=%d winnow=%d\n",
       DEFAULT_NTOKEN, DEFAULT_WINNOWSIZE);
   exit(EXIT_FAILURE);
 }
 
-void winnow(int w);
+
+void error_exit(const char *msg)
+{
+  (void) fprintf(stderr, "%s: %s - %s\n", program_name, msg, strerror(errno));
+  exit(EXIT_FAILURE);
+}
+
 
 long int parse_num(const char *s)
 {
@@ -53,15 +58,29 @@ long int parse_num(const char *s)
   return res;
 }
 
+
+void printfname(const char *fname)
+{
+  char absfname[PATH_MAX] = {'\0'};
+  // if the file is not an absolute pathname, prepend the cwd
+  if (fname[0] != '/') {
+    if (getcwd(absfname, sizeof absfname) == NULL)
+      error_exit("cannot get cwd");
+
+    (void) strncat(absfname, "/", 1);
+  }
+  (void) strncat(absfname, fname, strlen(fname));
+
+  if (printf("%s\n", absfname) < 0)
+    error_exit("cannot print file path");
+}
+
+
 int main(int argc, char *argv[])
 {
-
-  int opt_n=0, opt_w=0, opt_o=0;
-
-  outfile = stdout;
-
+  int opt_n=0, opt_w=0;
   int c;
-  while ((c = getopt(argc, argv, "n:w:o:")) != -1) {
+  while ((c = getopt(argc, argv, "n:w:")) != -1) {
     switch (c) {
       case 'n':
         if (opt_n++ > 0) usage();
@@ -73,15 +92,6 @@ int main(int argc, char *argv[])
         if (opt_w++ > 0) usage();
         Winnowsize = parse_num(optarg);
         break;
-      case 'o':
-        if (opt_o++ > 0) usage();
-        outfile = fopen(optarg, "w");
-        if (outfile == NULL) {
-          (void) fprintf(stderr, "%s: cannot open outfile %s: %s\n",
-              program_name, optarg, strerror(errno));
-          exit(EXIT_FAILURE);
-        }
-        break;
       case '?':
       default:
         usage();
@@ -92,36 +102,26 @@ int main(int argc, char *argv[])
 
   // allocate k-gram buffer
   tokenbuf = malloc(Ntoken * sizeof(int));
-  if (tokenbuf == NULL) {
-    (void) fprintf(stderr, "%s: cannot allocate buffer\n", program_name);
-    exit(EXIT_FAILURE);
-  }
+  if (tokenbuf == NULL)
+    error_exit("cannot allocate buffer");
 
   // for each file specified, call winnowing routine
   for (int i = optind; i < argc; i++) {
+    // TODO allow stdin
     yyin = fopen(argv[i], "r");
     if (yyin == NULL) {
       (void) fprintf(stderr,
           "%s: cannot open %s: %s\n", program_name, argv[i], strerror(errno));
       continue;
     }
+
+    // print absolute filename
+    printfname(argv[i]);
     ntoken = 0;
     winnow(Winnowsize); // main winnowing routine
     (void) fclose(yyin);
   }
-
   (void) free(tokenbuf);
-
-  // write the hashes to the outfile
-  qsort(hash_buf, hash_count, sizeof(hash_t),
-      (int (*)(const void *, const void *))hash_cmp);
-
-  (void) fwrite(&hash_count, sizeof hash_count, 1, outfile);
-  (void) fwrite(hash_buf, sizeof(hash_t), hash_count, outfile);
-
-  if (outfile != stdout)
-    (void) fclose(outfile);
-
   return 0;
 }
 
@@ -164,22 +164,14 @@ hash_t next_hash(void)
 
 
 /**
- * Output a given hash.
+ * Output a given hash with line number
  */
 void record(hash_t h)
 {
-  if (hash_count == hash_buf_capacity) {
-    hash_buf_capacity += 100;
-    hash_t *new_buf = realloc(hash_buf, hash_buf_capacity*sizeof(hash_t));
-    if (new_buf == NULL) {
-      (void) fprintf(stderr, "%s: cannot allocate memory\n",
-          program_name);
-      exit(EXIT_FAILURE);
-    }
-    hash_buf = new_buf;
-  }
-  hash_buf[hash_count++] = h;
+  if (printf("%016lx %d\n", h, yylineno) < 0)
+    error_exit("cannot print hash");
 }
+
 
 void winnow(int w) {
   // circular buffer implementing window of size w
