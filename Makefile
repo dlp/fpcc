@@ -7,7 +7,7 @@ LDFLAGS =
 
 .PHONY: all clean
 
-all: fpcc-sig fpcc-comp
+all: fpcc-sig fpcc-comp fpcc-idx
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
@@ -33,6 +33,11 @@ fpcc-comp.o: common.h
 fpcc-comp: fpcc-comp.o common.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
+# rules related to fpcc-comp
+fpcc-idx.o: common.h
+fpcc-idx: fpcc-idx.o common.o
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
+
 clean:
 	rm -f ccode.tab.{c,h} lex.yy.c *.o
-	rm -f fpcc-sig fpcc-comp
+	rm -f fpcc-sig fpcc-comp fpcc-idx
