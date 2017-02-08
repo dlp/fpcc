@@ -81,17 +81,6 @@ inline static int containment(int na, int nboth, int nexcl)
 }
 
 
-long int parse_num(const char *s)
-{
-  char *eptr;
-  long int res;
-
-  res = strtol(s, &eptr, 10);
-  if (*eptr != '\0') usage();
-  return res;
-}
-
-
 void print_if_threshold(const char *join,
     const char *fname1, const char *fname2,
     int value, int threshold)
@@ -194,8 +183,7 @@ int main(int argc, char *argv[])
         if (rb >= thresh || ct1 >= thresh || ct2 >= thresh) {
           if (printf("%s;%s;%d;%d;%d\n",
                 siglist[i].fname, siglist[j].fname, rb, ct1, ct2) < 0) {
-            (void) fprintf(stderr, "%s: cannot print result: %s\n",
-                program_name, strerror(errno));
+            error_exit("cannot print result");
           }
         }
       } else {
@@ -240,9 +228,7 @@ sig_t *new_sig(void)
     sl_cap += 100;
     sig_t *newlist = realloc(siglist, sl_cap*sizeof(sig_t));
     if (newlist == NULL) {
-      (void) fprintf(stderr, "%s: cannot allocate memory\n",
-          program_name);
-      exit(EXIT_FAILURE);
+      error_exit("cannot allocate memory");
     }
     siglist = newlist;
   }
@@ -263,32 +249,31 @@ void load(const char *fname, sig_t *sig)
         program_name, fname, strerror(errno));
     return;
   }
+  DBG("Reading '%s'\n", fname);
 
   int cnt = fread(&hash_count, sizeof hash_count, 1, f);
   if (cnt != 1) {
-    (void) fprintf(stderr, "%s: error reading %s: %s\n",
-        program_name, fname, strerror(errno));
+    (void) fprintf(stderr, "%s: error reading %s\n",
+        program_name, fname);
     exit(EXIT_FAILURE);
   }
-
-  hash_buf = malloc(hash_count * sizeof(hash_t));
+  hash_buf = malloc((hash_count - 1) * sizeof(hash_t));
   if (hash_buf == NULL) {
-    (void) fprintf(stderr, "%s: can't allocate buffer\n", program_name);
-    exit(EXIT_FAILURE);
+    error_exit("can't allocate buffer");
   }
-  if (fread(hash_buf, sizeof(hash_t), hash_count, f) < hash_count) {
-    (void) fprintf(stderr, "%s: error reading %s: %s\n",
-        program_name, fname, strerror(errno));
-    exit(EXIT_FAILURE);
+  for (int i = 0; i < hash_count; i++) {
+    hash_entry_t entry;
+    if (fread(&entry, sizeof(hash_entry_t), 1, f) != 1) {
+      (void) fprintf(stderr, "%s: error reading %s\n",
+          program_name, fname);
+      exit(EXIT_FAILURE);
+    }
+    // the first entry is a dummy entry, which we have to skip
+    if (i > 0) {
+      DBG("%016lx\n", entry.hash);
+      hash_buf[i-1] = entry.hash;
+    }
   }
-
-
-  // while ((cnt = fread(&hash_buf[hash_count],
-  //     sizeof(hash_t), CHUNK_SIZE, f)) > 0) {
-  //   
-  //   hash_count += cnt;
-  // }
-
   (void) fclose(f);
 
   sig->fname = strdup(fname);

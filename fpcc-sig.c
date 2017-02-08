@@ -15,6 +15,8 @@
 #include <openssl/md5.h>
 #include "common.h"
 
+const char *program_name = "fpcc-sig";
+
 // we are using our generated scanner
 extern int yylex (void);
 extern FILE *yyin;
@@ -26,10 +28,8 @@ int Winnowsize = DEFAULT_WINNOWSIZE;
 static int ntoken; // number of tokens read for current file
 static int *tokenbuf; // buffer for tokens
 
-const char *program_name = "fpcc-sig";
 
 void winnow(int w);
-
 
 void usage(void)
 {
@@ -41,24 +41,9 @@ void usage(void)
 }
 
 
-void error_exit(const char *msg)
-{
-  (void) fprintf(stderr, "%s: %s - %s\n", program_name, msg, strerror(errno));
-  exit(EXIT_FAILURE);
-}
-
-
-long int parse_num(const char *s)
-{
-  char *eptr;
-  long int res;
-
-  res = strtol(s, &eptr, 10);
-  if (*eptr != '\0') usage();
-  return res;
-}
-
-
+/**
+ * Print an absolute path to fname
+ */
 void printfname(const char *fname)
 {
   char absfname[PATH_MAX] = {'\0'};

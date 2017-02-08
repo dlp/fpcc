@@ -16,10 +16,12 @@
 
 const char *program_name = "fpcc-idx";
 
+static FILE *outfile = NULL;
+
 struct {
   uint32_t count;
   size_t capacity;
-  hash_idx_t *buf;
+  hash_entry_t *buf;
 } hashes;
 
 struct {
@@ -28,7 +30,6 @@ struct {
   char **buf;
 } paths;
 
-static FILE *outfile = NULL;
 
 void usage(void)
 {
@@ -37,44 +38,39 @@ void usage(void)
 }
 
 
-void error_exit(const char *msg)
-{
-  (void) fprintf(stderr, "%s: %s - %s\n", program_name, msg, strerror(errno));
-  exit(EXIT_FAILURE);
-}
-
-
-int hashp_cmp(const hash_idx_t **p1, const hash_idx_t **p2)
+int hashp_cmp(const hash_entry_t **p1, const hash_entry_t **p2)
 {
   if ((*p1)->hash < (*p2)->hash) return -1;
   if ((*p1)->hash > (*p2)->hash) return  1;
   return 0;
 }
 
+
 void hash_add(hash_t h, uint16_t linepos, uint16_t filecnt)
 {
   if (hashes.count == hashes.capacity) {
-    hashes.capacity += 1000;
-    hash_idx_t *new_buf = realloc(hashes.buf,
-        hashes.capacity*sizeof(hash_idx_t));
+    hashes.capacity += 1024;
+    hash_entry_t *new_buf = realloc(hashes.buf,
+        hashes.capacity * sizeof(hash_entry_t));
     if (new_buf == NULL) {
       error_exit("cannot allocate memory");
     }
     hashes.buf = new_buf;
   }
-  hash_idx_t *hashp = &hashes.buf[hashes.count++];
+  hash_entry_t *hashp = &hashes.buf[hashes.count++];
   hashp->hash = h;
   hashp->linepos = linepos;
   hashp->filecnt = filecnt;
   hashp->next = 0;
 }
 
+
 void path_add(const char *s)
 {
   if (paths.count == paths.capacity) {
     paths.capacity += 256;
     char **new_buf = realloc(paths.buf,
-        paths.capacity*sizeof(char *));
+        paths.capacity * sizeof(char *));
     if (new_buf == NULL) {
       error_exit("cannot allocate memory");
     }
@@ -84,17 +80,17 @@ void path_add(const char *s)
 }
 
 
-void hash_idx_write(const hash_idx_t *entry)
+void hash_idx_write(const hash_entry_t *entry)
 {
-  //(void) printf("%016lx l%d f%d n%d\n", entry->hash, entry->linepos,
-  //    entry->filecnt, entry->next);
+  DBG("%016lx l%d f%d n%d\n", entry->hash, entry->linepos,
+      entry->filecnt, entry->next);
   // FIXME proper serialization
-  (void) fwrite(entry, sizeof *entry, 1, outfile);
+  (void) fwrite(entry, sizeof(hash_entry_t), 1, outfile);
 }
 
 void path_write(const char *pth)
 {
-  //(void) printf("Path: %s\n", paths.buf[i]);
+  DBG("Path: %s\n", pth);
   (void) fputs(pth, outfile);
   (void) fputc('\0', outfile);
 }
@@ -157,11 +153,11 @@ int main(int argc, char *argv[])
   }
 
   // external sort of the inputs, but spare the first
-  hash_idx_t **sorted = malloc(hashes.count * sizeof(hash_idx_t *));
+  hash_entry_t **sorted = malloc(hashes.count * sizeof(hash_entry_t *));
   for (int i = 0; i < hashes.count; i++) {
     sorted[i] = &hashes.buf[i];
   }
-  qsort(&sorted[1], hashes.count - 1, sizeof(hash_idx_t *),
+  qsort(&sorted[1], hashes.count - 1, sizeof(hash_entry_t *),
       (int (*)(const void *, const void *))hashp_cmp);
 
   // create inverse map for successors
@@ -171,7 +167,7 @@ int main(int argc, char *argv[])
   }
 
   // how to reconstruct order
-  hash_idx_t *inp = hashes.buf;
+  hash_entry_t *inp = hashes.buf;
   int k = sorted[0]->next;
   while (k > 0) {
     assert((++inp)->hash == sorted[k]->hash);
@@ -193,7 +189,7 @@ int main(int argc, char *argv[])
     free(paths.buf[i]);
   }
   free(paths.buf);
-  // TODO read back in the paths with getdelim(3)
+  // XXX read back in the paths with getdelim(3)
 
   if (fclose(outfile) != 0) {
     error_exit("cannot close outfile");

@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 
 CC = gcc
-CFLAGS = -std=c99 -pedantic -Wall -g -D_DEFAULT_SOURCE
+CFLAGS = -std=c99 -pedantic -Wall -g -D_DEFAULT_SOURCE -DDEBUG
 LDFLAGS =
 
 .PHONY: all clean
