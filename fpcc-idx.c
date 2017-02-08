@@ -16,15 +16,23 @@
 
 const char *program_name = "fpcc-idx";
 
+struct {
+  uint32_t count;
+  size_t capacity;
+  hash_idx_t *buf;
+} hashes;
 
-uint32_t hash_inputs_count; // number of hashes recorded
-int hash_inputs_capacity;
-hash_idx_t *hash_inputs = NULL;
+struct {
+  uint32_t count;
+  size_t capacity;
+  char **buf;
+} paths;
 
+static FILE *outfile = NULL;
 
 void usage(void)
 {
-  (void) fprintf(stderr, "USAGE: %s tbd\n", program_name);
+  (void) fprintf(stderr, "USAGE: %s -o outfile\n", program_name);
   exit(EXIT_FAILURE);
 }
 
@@ -36,16 +44,6 @@ void error_exit(const char *msg)
 }
 
 
-long int parse_num(const char *s)
-{
-  char *eptr;
-  long int res;
-
-  res = strtol(s, &eptr, 10);
-  if (*eptr != '\0') usage();
-  return res;
-}
-
 int hashp_cmp(const hash_idx_t **p1, const hash_idx_t **p2)
 {
   if ((*p1)->hash < (*p2)->hash) return -1;
@@ -55,40 +53,86 @@ int hashp_cmp(const hash_idx_t **p1, const hash_idx_t **p2)
 
 void hash_add(hash_t h, uint16_t linepos, uint16_t filecnt)
 {
-  if (hash_inputs_count == hash_inputs_capacity) {
-    hash_inputs_capacity += 1000;
-    hash_idx_t *new_buf = realloc(hash_inputs,
-        hash_inputs_capacity*sizeof(hash_idx_t));
+  if (hashes.count == hashes.capacity) {
+    hashes.capacity += 1000;
+    hash_idx_t *new_buf = realloc(hashes.buf,
+        hashes.capacity*sizeof(hash_idx_t));
     if (new_buf == NULL) {
       error_exit("cannot allocate memory");
     }
-    hash_inputs = new_buf;
+    hashes.buf = new_buf;
   }
-  hash_idx_t *hashp = &hash_inputs[hash_inputs_count++];
+  hash_idx_t *hashp = &hashes.buf[hashes.count++];
   hashp->hash = h;
   hashp->linepos = linepos;
   hashp->filecnt = filecnt;
   hashp->next = 0;
 }
 
-void hash_idx_write(hash_idx_t *entry)
+void path_add(const char *s)
 {
-  (void) printf("index %016lx n:%d\n", entry->hash, entry->next);
+  if (paths.count == paths.capacity) {
+    paths.capacity += 256;
+    char **new_buf = realloc(paths.buf,
+        paths.capacity*sizeof(char *));
+    if (new_buf == NULL) {
+      error_exit("cannot allocate memory");
+    }
+    paths.buf = new_buf;
+  }
+  paths.buf[paths.count++] = strdup(s);
 }
 
 
+void hash_idx_write(const hash_idx_t *entry)
+{
+  //(void) printf("%016lx l%d f%d n%d\n", entry->hash, entry->linepos,
+  //    entry->filecnt, entry->next);
+  // FIXME proper serialization
+  (void) fwrite(entry, sizeof *entry, 1, outfile);
+}
+
+void path_write(const char *pth)
+{
+  //(void) printf("Path: %s\n", paths.buf[i]);
+  (void) fputs(pth, outfile);
+  (void) fputc('\0', outfile);
+}
+
 int main(int argc, char *argv[])
 {
+  int opt_o=0;
+  int c;
+  while ((c = getopt(argc, argv, "o:")) != -1) {
+    switch (c) {
+      case 'o':
+        if (opt_o++ > 0) usage();
+        outfile = fopen(optarg, "w");
+        if (outfile == NULL) {
+          error_exit("cannot open outfile");
+        }
+        break;
+      case '?':
+      default:
+        usage();
+    }
+  }
+  // outfile is mandatory
+  if (opt_o == 0) usage();
+  // no arguments should be specified
+  if (argc - optind != 0) usage();
+
   char line[LINE_MAX];
   FILE *infile = stdin;
+  int filecnt = -1;
 
   // add dummy entry
-  hash_add(0, 0, -1);
+  hash_add(0, 0, filecnt);
 
+  // read input and store data
   while (fgets(line, sizeof line, infile) != NULL) {
     hash_t h;
     int linepos;
-    int filecnt = -1;
 
     // hash with line number
     if (sscanf(line, "%016lx %d\n", &h, &linepos) == 2) {
@@ -96,16 +140,15 @@ int main(int argc, char *argv[])
       hash_add(h, linepos, filecnt);
       continue;
     }
-
     // an absolute path
     if (line[0] == '/') {
+      size_t len = strcspn(line, "\r\n");
       // remove trailing newline
-      line[strcspn(line, "\n")] = '\0';
-      (void) printf("Path: %s\n", line);
+      line[len] = '\0';
+      path_add(line);
       filecnt++;
       continue;
     }
-
     // warning, ignore line
     (void) fprintf(stderr, "warning: cannot parse line: %s", line);
   }
@@ -114,26 +157,21 @@ int main(int argc, char *argv[])
   }
 
   // external sort of the inputs, but spare the first
-  hash_idx_t **sorted = malloc(hash_inputs_count * sizeof(hash_idx_t *));
-  for (int i = 0; i < hash_inputs_count; i++) {
-    sorted[i] = &hash_inputs[i];
+  hash_idx_t **sorted = malloc(hashes.count * sizeof(hash_idx_t *));
+  for (int i = 0; i < hashes.count; i++) {
+    sorted[i] = &hashes.buf[i];
   }
-  qsort(&sorted[1], hash_inputs_count - 1, sizeof(hash_idx_t *),
+  qsort(&sorted[1], hashes.count - 1, sizeof(hash_idx_t *),
       (int (*)(const void *, const void *))hashp_cmp);
 
   // create inverse map for successors
   // with a little ptr arithmetic
-  for (int i = 1; i < hash_inputs_count; i++) {
+  for (int i = 1; i < hashes.count; i++) {
     (sorted[i] - 1)->next = i;
   }
 
-  // output the table
-  for (int i = 0; i < hash_inputs_count; i++) {
-    hash_idx_write(sorted[i]);
-  }
-
   // how to reconstruct order
-  hash_idx_t *inp = hash_inputs;
+  hash_idx_t *inp = hashes.buf;
   int k = sorted[0]->next;
   while (k > 0) {
     assert((++inp)->hash == sorted[k]->hash);
@@ -141,8 +179,25 @@ int main(int argc, char *argv[])
     k = sorted[k]->next;
   }
 
+  // output the table
+  (void) fwrite(&hashes.count, sizeof hashes.count, 1, outfile);
+  for (int i = 0; i < hashes.count; i++) {
+    hash_idx_write(sorted[i]);
+  }
   free(sorted);
-  free(hash_inputs);
+  free(hashes.buf);
+
+  // output paths
+  for (int i = 0; i < paths.count; i++) {
+    path_write(paths.buf[i]);
+    free(paths.buf[i]);
+  }
+  free(paths.buf);
+  // TODO read back in the paths with getdelim(3)
+
+  if (fclose(outfile) != 0) {
+    error_exit("cannot close outfile");
+  }
 
   exit(EXIT_SUCCESS);
 }
