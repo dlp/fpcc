@@ -7,7 +7,7 @@ LDFLAGS =
 
 .PHONY: all clean
 
-all: fpcc-sig fpcc-comp fpcc-idx
+all: fpcc-sig fpcc-comp fpcc-idx fpcc-map
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
@@ -33,9 +33,14 @@ fpcc-comp.o: common.h
 fpcc-comp: fpcc-comp.o common.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-# rules related to fpcc-comp
+# rules related to fpcc-idx
 fpcc-idx.o: common.h
 fpcc-idx: fpcc-idx.o common.o
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
+
+# rules related to fpcc-map
+fpcc-map.o: common.h
+fpcc-map: fpcc-map.o common.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 clean:
