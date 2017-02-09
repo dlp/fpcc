@@ -18,13 +18,12 @@ const char *program_name = "fpcc-map";
 
 struct hashes {
   uint32_t count;
-  hash_entry_t *buf;
+  hash_entry_t *arr;
 } hashes1, hashes2;
 
 struct paths {
   uint32_t count;
-  size_t capacity;
-  char **buf;
+  char **arr;
 } paths1, paths2;
 
 
@@ -44,15 +43,26 @@ void load_file(const char *fname, struct hashes *hashes, struct paths *paths)
   if (fread(&hashes->count, sizeof hashes->count, 1, f) != 1) {
     goto fail;
   }
-  hashes->buf = malloc((hashes->count) * sizeof(hash_entry_t));
-  if (hashes->buf == NULL) {
+  hashes->arr = malloc((hashes->count) * sizeof(hash_entry_t));
+  if (hashes->arr == NULL) {
     error_exit("can't allocate buffer");
   }
-  if (fread(hashes->buf, sizeof(hash_entry_t),
+  if (fread(hashes->arr, sizeof(hash_entry_t),
         hashes->count, f) != hashes->count) {
     goto fail;
   }
-  // TODO paths
+  // now the paths
+  if (fread(&paths->count, sizeof paths->count, 1, f) != 1) {
+    goto fail;
+  }
+  paths->arr = calloc(paths->count, sizeof(char *));
+  if (paths->arr == NULL) {
+    error_exit("can't allocate buffer");
+  }
+  size_t len = 0;
+  char **pptr = paths->arr;
+  while (getdelim(pptr++, &len, '\0', f) != -1);
+
   (void) fclose(f);
   return;
 
@@ -82,14 +92,21 @@ int main(int argc, char *argv[])
 
 
   // iterate in input order
-  int k = hashes1.buf[0].next;
+  int k = hashes1.arr[0].next;
   while (k > 0) {
-    hash_entry_t *he = &hashes1.buf[k];
+    hash_entry_t *he = &hashes1.arr[k];
     DBG("%016lx l%d f%d n%d\n", he->hash, he->linepos,
         he->filecnt, he->next);
     k = he->next;
   }
-  free(hashes1.buf);
+  free(hashes1.arr);
+
+
+  for (int i = 0; i < paths1.count; i++) {
+    DBG("Path: %s\n", paths1.arr[i]);
+    free(paths1.arr[i]);
+  }
+  free(paths1.arr);
 
   exit(EXIT_SUCCESS);
 }

@@ -184,12 +184,12 @@ int main(int argc, char *argv[])
   free(hashes.buf);
 
   // output paths
+  (void) fwrite(&paths.count, sizeof paths.count, 1, outfile);
   for (int i = 0; i < paths.count; i++) {
     path_write(paths.buf[i]);
     free(paths.buf[i]);
   }
   free(paths.buf);
-  // XXX read back in the paths with getdelim(3)
 
   if (fclose(outfile) != 0) {
     error_exit("cannot close outfile");
