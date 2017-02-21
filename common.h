@@ -3,12 +3,15 @@
 
 #include <stdint.h>
 
-// default options for csig
+// default options for sig
 #define DEFAULT_NTOKEN     5
 #define DEFAULT_WINNOWSIZE 4
 
 // default options for comp
 #define DEFAULT_THRESHOLD 0
+
+// default options for map
+#define DEFAULT_MIN_REGION_SIZE 4
 
 #ifdef DEBUG
 #define DBG(...)  do {\

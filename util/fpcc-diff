@@ -1,0 +1,15 @@
+#!/bin/bash
+
+
+# sudo apt-get install source-highlight
+# highlight C source code in file.c to terminal, with line numbering
+source-highlight -n -s C -f esc256 --line-range="$1-$2" -i file.c
+
+
+# for side-by-side comparison, coloring does not work:
+
+# print only lines in specified range, with nice numbering
+awk "NR>=$1 && NR<=$2 {print \$0 }" <(nl -ba file.c)
+
+# Display two files side by side, use terminal width
+pr -mt -w ${COLUMNS} file1 file2

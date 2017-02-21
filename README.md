@@ -152,6 +152,17 @@ Contact: Daniel Prokesch
 
 ---
 
+References
+---
+
+Tichy, Walter F.,
+"The String-to-String Correction Problem with Block Moves" (1983).
+Computer Science Technical Reports. Paper 378.
+http://docs.lib.purdue.edu/cstech/378
+
+
+---
+
 [1]: http://www.cs.usyd.edu.au/~scilect/sherlock/
 [2]: http://www.quut.com/c/ANSI-C-grammar-l-2011.html
 [3]: https://theory.stanford.edu/~aiken/publications/papers/sigmod03.pdf

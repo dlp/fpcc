@@ -19,18 +19,20 @@ typedef struct {
   hash_t *hashes; // pointer to array of hashes
 } sig_t;
 
-int thresh = DEFAULT_THRESHOLD;
-
 const char *program_name = "fpcc-comp";
 
-sig_t *new_sig(void);
-void load(const char *, sig_t *);
-void count(int *, int *, sig_t *, sig_t *, sig_t *);
+
+static int thresh = DEFAULT_THRESHOLD;
 
 // the global list of document's fingerprints
 // - a dynamically growing array
 static sig_t *siglist;
 static int sl_cnt=0, sl_cap=0;
+
+
+sig_t *new_sig(void);
+void load(const char *, sig_t *);
+void count(int *, int *, sig_t *, sig_t *, sig_t *);
 
 /**
  * Print a usage message to stderr and exit with EXIT_FAILURE.

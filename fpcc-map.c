@@ -22,10 +22,14 @@ struct index {
   char **paths;
 };
 
+static int min_region_size = DEFAULT_MIN_REGION_SIZE;
+
 
 void usage(void)
 {
   (void) fprintf(stderr, "USAGE: %s file1 file2\n", program_name);
+  (void) fprintf(stderr, "  defaults: min_region_size=%d\n",
+      DEFAULT_MIN_REGION_SIZE);
   exit(EXIT_FAILURE);
 }
 
@@ -56,6 +60,13 @@ void load_file(const char *fname, struct index *idx)
   if (idx->paths == NULL) {
     error_exit("can't allocate buffer");
   }
+  // A NULL at the end enables following iteration scheme
+  /*
+  for (char **pptr = idx1.paths; *pptr != NULL; pptr++) {
+    DBG("Path: %s\n", *pptr);
+  }
+  */
+
   size_t len = 0;
   for (int i = 0; i < idx->path_cnt; i++) {
     (void) getdelim(&idx->paths[i], &len, '\0', f);
@@ -71,12 +82,56 @@ fail: ;
 }
 
 
+void cleanup_idx(struct index *idx)
+{
+  free(idx->hashes);
+  for (char **pptr = idx->paths; *pptr != NULL; free(*pptr++)) ;
+  free(idx->paths);
+}
+
+/**
+ * An iterator for hash_entries of a specified hash value
+ */
+struct hash_iter {
+  hash_entry_t *ptr;
+};
+
+
+void hash_iter_init(struct hash_iter *it, struct index *idx,
+    hash_entry_t *entry)
+{
+  it->ptr = bsearch(entry, idx->hashes, idx->hash_cnt, sizeof(hash_entry_t),
+      (int (*)(const void *, const void *))hash_cmp);
+
+  if (it->ptr != NULL) {
+    // find first
+    while (hash_cmp(&it->ptr->hash, &(it->ptr-1)->hash) == 0) it->ptr--;
+  }
+}
+
+hash_entry_t *hash_iter_next(struct hash_iter *it)
+{
+  hash_entry_t *res = it->ptr;
+  if (it->ptr != NULL && hash_cmp(&it->ptr->hash, &(it->ptr+1)->hash) == 0) {
+    it->ptr++;
+  } else {
+    it->ptr = NULL;
+  }
+  return res;
+}
+
 
 int main(int argc, char *argv[])
 {
+  int opt_m = 0;
   int c;
-  while ((c = getopt(argc, argv, "")) != -1) {
+  while ((c = getopt(argc, argv, "m:")) != -1) {
     switch (c) {
+      case 'm':
+        if (opt_m++ > 0) usage();
+        min_region_size = parse_num(optarg);
+        if (min_region_size < 0) usage();
+        break;
       case '?':
       default:
         usage();
@@ -89,26 +144,67 @@ int main(int argc, char *argv[])
   load_file(argv[optind], &idx1);
   load_file(argv[optind + 1], &idx2);
 
+  // use Tichy's algorithm for finding maximal string moves
 
-
-  // iterate in input order
-  int k = idx1.hashes[0].next;
+  // iterate target in input order
+  int k = idx2.hashes[0].next;
   while (k > 0) {
-    hash_entry_t *he = &idx1.hashes[k];
-    DBG("%016lx l%d f%d n%d\n", he->hash, he->linepos,
-        he->filecnt, he->next);
-    k = he->next;
-  }
-  free(idx1.hashes);
+    hash_entry_t *src, *tgt = &idx2.hashes[k];
+    DBG("%016lx l%d f%d n%d\n", tgt->hash, tgt->linepos,
+        tgt->filecnt, tgt->next);
 
-  //for (int i = 0; i < idx1.path_cnt; i++) {
-  for (char **pptr = idx1.paths; *pptr != NULL; pptr++) {
-    //DBG("Path: %s\n", idx1.paths[i]);
-    DBG("Path: %s\n", *pptr);
-    //free(idx1.paths[i]);
-    free(*pptr);
+    // walk through source and find the longest common prefix
+    struct hash_iter it;
+    hash_iter_init(&it, &idx1, tgt);
+    // store the best match (longest chain)
+    hash_entry_t *best_src, *best_src_end, *tgt_end = tgt;
+    int best_count = 0;
+    while ((src = hash_iter_next(&it)) != NULL) {
+      DBG("other %016lx l%d f%d n%d\n", src->hash, src->linepos,
+          src->filecnt, src->next);
+
+      // follow both chains as long as they're the same, count
+      hash_entry_t *t = tgt, *s = src;
+      hash_entry_t *tn, *sn;
+      int count = 1;
+      do {
+        if (s->next == 0 || t->next == 0) break;
+        sn = &idx1.hashes[s->next];
+        tn = &idx2.hashes[t->next];
+        if (sn->filecnt == s->filecnt &&
+            tn->filecnt == t->filecnt &&
+            hash_cmp(&sn->hash, &tn->hash) == 0) {
+          // extend the chain
+          s = sn;
+          t = tn;
+          count++;
+        } else break;
+      } while (1);
+
+      // store the last element in the chain
+      if (count > best_count) {
+        best_src = src;
+        best_src_end = s;
+        tgt_end = t;
+        best_count = count;
+      }
+      assert(count >= 0);
+      DBG("chain length: %d\n", count);
+    }
+    DBG("best chain length: %d\n", best_count);
+    // record region if it has substantial size
+    if (best_count >= min_region_size) {
+      DBG("REGION: size %d, ---%s:%d,%d +++%s:%d,%d\n", best_count,
+          idx1.paths[best_src->filecnt],
+          best_src->linepos, best_src_end->linepos,
+          idx2.paths[tgt->filecnt], tgt->linepos, tgt_end->linepos
+          );
+    }
+    k = tgt_end->next;
   }
-  free(idx1.paths);
+
+  cleanup_idx(&idx1);
+  cleanup_idx(&idx2);
 
   exit(EXIT_SUCCESS);
 }
