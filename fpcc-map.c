@@ -120,6 +120,76 @@ hash_entry_t *hash_iter_next(struct hash_iter *it)
   return res;
 }
 
+void record(int match_size,
+    char *fname1, int beg1, int end1,
+    char *fname2, int beg2, int end2)
+{
+  ssize_t res = printf("%s:%d,%d -- %s:%d,%d\n",
+      fname1, beg1, end1-beg1, fname2, beg2, end2-beg2);
+  if (res < 0) {
+    error_exit("cannot output match");
+  }
+}
+
+void construct_target(struct index *idx_src, struct index *idx_tgt)
+{
+  // iterate target in input order
+  int k = idx_tgt->hashes[0].next;
+  while (k > 0) {
+    hash_entry_t *src, *tgt = &idx_tgt->hashes[k];
+    DBG("target %016lx l%d f%d n%d\n", tgt->hash, tgt->linepos,
+        tgt->filecnt, tgt->next);
+
+    // walk through source and find the longest common prefix
+    struct hash_iter it;
+    hash_entry_t *tgt_end = tgt;
+    // store the best match (longest chain)
+    hash_entry_t *best_src, *best_src_end;
+    int best_count = 0;
+    hash_iter_init(&it, idx_src, tgt);
+    while ((src = hash_iter_next(&it)) != NULL) {
+      DBG("source %016lx l%d f%d n%d\n", src->hash, src->linepos,
+          src->filecnt, src->next);
+
+      // follow both chains as long as they're the same, count
+      hash_entry_t *t = tgt, *s = src;
+      hash_entry_t *tn, *sn; // next elements
+      int count = 1;
+      while (s->next != 0 && t->next != 0) {
+        sn = &idx_src->hashes[s->next];
+        tn = &idx_tgt->hashes[t->next];
+        if (sn->filecnt == s->filecnt &&
+            tn->filecnt == t->filecnt &&
+            hash_cmp(&sn->hash, &tn->hash) == 0) {
+          // extend the chain
+          s = sn;
+          t = tn;
+          count++;
+        } else break;
+      }
+
+      // store the start/end of the longest common chain
+      if (count > best_count) {
+        best_src = src;
+        best_src_end = s;
+        tgt_end = t;
+        best_count = count;
+      }
+      assert(count >= 0);
+      DBG("chain length: %d\n", count);
+    }
+    DBG("best chain length: %d\n", best_count);
+    // record region if it has substantial size
+    if (best_count >= min_region_size) {
+      record(best_count,
+          idx_src->paths[best_src->filecnt],
+          best_src->linepos, best_src_end->linepos,
+          idx_tgt->paths[tgt->filecnt], tgt->linepos, tgt_end->linepos
+          );
+    }
+    k = tgt_end->next;
+  }
+}
 
 int main(int argc, char *argv[])
 {
@@ -145,63 +215,7 @@ int main(int argc, char *argv[])
   load_file(argv[optind + 1], &idx2);
 
   // use Tichy's algorithm for finding maximal string moves
-
-  // iterate target in input order
-  int k = idx2.hashes[0].next;
-  while (k > 0) {
-    hash_entry_t *src, *tgt = &idx2.hashes[k];
-    DBG("%016lx l%d f%d n%d\n", tgt->hash, tgt->linepos,
-        tgt->filecnt, tgt->next);
-
-    // walk through source and find the longest common prefix
-    struct hash_iter it;
-    hash_iter_init(&it, &idx1, tgt);
-    // store the best match (longest chain)
-    hash_entry_t *best_src, *best_src_end, *tgt_end = tgt;
-    int best_count = 0;
-    while ((src = hash_iter_next(&it)) != NULL) {
-      DBG("other %016lx l%d f%d n%d\n", src->hash, src->linepos,
-          src->filecnt, src->next);
-
-      // follow both chains as long as they're the same, count
-      hash_entry_t *t = tgt, *s = src;
-      hash_entry_t *tn, *sn;
-      int count = 1;
-      do {
-        if (s->next == 0 || t->next == 0) break;
-        sn = &idx1.hashes[s->next];
-        tn = &idx2.hashes[t->next];
-        if (sn->filecnt == s->filecnt &&
-            tn->filecnt == t->filecnt &&
-            hash_cmp(&sn->hash, &tn->hash) == 0) {
-          // extend the chain
-          s = sn;
-          t = tn;
-          count++;
-        } else break;
-      } while (1);
-
-      // store the last element in the chain
-      if (count > best_count) {
-        best_src = src;
-        best_src_end = s;
-        tgt_end = t;
-        best_count = count;
-      }
-      assert(count >= 0);
-      DBG("chain length: %d\n", count);
-    }
-    DBG("best chain length: %d\n", best_count);
-    // record region if it has substantial size
-    if (best_count >= min_region_size) {
-      DBG("REGION: size %d, ---%s:%d,%d +++%s:%d,%d\n", best_count,
-          idx1.paths[best_src->filecnt],
-          best_src->linepos, best_src_end->linepos,
-          idx2.paths[tgt->filecnt], tgt->linepos, tgt_end->linepos
-          );
-    }
-    k = tgt_end->next;
-  }
+  construct_target(&idx2, &idx1);
 
   cleanup_idx(&idx1);
   cleanup_idx(&idx2);
