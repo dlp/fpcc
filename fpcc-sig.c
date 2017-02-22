@@ -42,20 +42,14 @@ void usage(void)
 
 
 /**
- * Print an absolute path to fname
+ * Print an canonicalized absolute pathname
  */
 void printfname(const char *fname)
 {
   char absfname[PATH_MAX] = {'\0'};
-  // if the file is not an absolute pathname, prepend the cwd
-  if (fname[0] != '/') {
-    if (getcwd(absfname, sizeof absfname) == NULL)
-      error_exit("cannot get cwd");
-
-    (void) strncat(absfname, "/", 1);
+  if (realpath(fname, absfname) == NULL) {
+    error_exit("cannot canonicalize pathname");
   }
-  (void) strncat(absfname, fname, strlen(fname));
-
   if (printf("%s\n", absfname) < 0)
     error_exit("cannot print file path");
 }
