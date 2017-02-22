@@ -29,21 +29,26 @@ shift $((OPTIND-1))
 
 # arguments: filename, startline, length
 function section {
-  local fname="$(cd $(dirname $1); pwd)/$(basename $1)"
+  local fname=$1
+  local fname_c
   local start=$(( $2 - ${CONTEXT} ))
   local end=$(( $2 + $3 + ${CONTEXT} ))
 
   if [[ -f "${fname}" ]]
   then
-    printf "\n%s %d-%d\n\n" "${fname}" ${start} ${end}
-    if [[ ${SIDEBYSIDE} -ne 0 ]] || ! which source-highlight
+    fname_c="$(cd $(dirname $1); pwd)/$(basename $1)"
+    printf "\n%s %d-%d\n\n" "${fname_c}" ${start} ${end}
+    if [[ ${SIDEBYSIDE} -ne 0 ]] || ! which source-highlight 2>&1 >/dev/null
     then
       # print only lines in specified range, with nice numbering
-      awk "NR>=${start} && NR<=${end} {print \$0 }" <(nl -ba -s"  " ${fname})
+      awk "NR>=${start} && NR<=${end} {print \$0 }" <(nl -ba -s"  " ${fname_c})
     else
       # highlight C source code to terminal, with line numbering
-      source-highlight -n -s C -f esc --line-range="${start}-${end}" -i ${fname}
+      source-highlight -n -s C -f esc \
+        --line-range="${start}-${end}" -i ${fname_c}
     fi
+  else
+    printf "\n%s - does not exist!\n\n" "${fname}"
   fi
 }
 
