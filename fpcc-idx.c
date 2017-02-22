@@ -166,6 +166,7 @@ int main(int argc, char *argv[])
     (sorted[i] - 1)->next = i;
   }
 
+#ifndef NDEBUG
   // how to reconstruct order
   hash_entry_t *inp = hashes.buf;
   int k = sorted[0]->next;
@@ -174,6 +175,7 @@ int main(int argc, char *argv[])
     //(void) printf("Thread: %d : %016lx\n", k, sorted[k]->hash);
     k = sorted[k]->next;
   }
+#endif
 
   // output the table
   (void) fwrite(&hashes.count, sizeof hashes.count, 1, outfile);

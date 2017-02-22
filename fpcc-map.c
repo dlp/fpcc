@@ -1,6 +1,12 @@
 /**
  * fpcc-map - Show similar regions in files.
  *
+ * Takes two fingerprint indices and finds common regions,
+ * that is, consecutive matching hashes.
+ *
+ * The regions are printed to stdout, one line for each region, in the format:
+ * file1:start1,count1 -- file2:start2,count2
+ * where start and count are line numbers.
  *
  * Author: Daniel Prokesch <daniel.prokesch@gmail.com>
  */
@@ -16,24 +22,45 @@
 
 const char *program_name = "fpcc-map";
 
+/**
+ * The fingerprint index as stored in a file by fpcc-idx.
+ */
 struct index {
   uint32_t hash_cnt, path_cnt;
   hash_entry_t *hashes;
   char **paths;
 };
 
+
+/**
+ * An iterator for hash_entries of a specified hash value
+ */
+struct hash_iter {
+  // invariant: ptr points to the next element,
+  // last to the last of all available hashes
+  hash_entry_t *ptr, *last;
+};
+
+// Matching regions (consecutive hashes) below this value are not emitted.
+// The units are number of hashes.
 static int min_region_size = DEFAULT_MIN_REGION_SIZE;
 
 
 void usage(void)
 {
-  (void) fprintf(stderr, "USAGE: %s file1 file2\n", program_name);
-  (void) fprintf(stderr, "  defaults: min_region_size=%d\n",
+  (void) fprintf(stderr, "USAGE: %s [-m min_region_size] file1 file2\n",
+      program_name);
+  (void) fprintf(stderr, "\nOptions:\n"
+      "  min_region_size ... matching regions (consecutive hashes) below\n"
+      "                      this value are not emitted. Default: %d\n",
       DEFAULT_MIN_REGION_SIZE);
   exit(EXIT_FAILURE);
 }
 
 
+/**
+ * Load the fingerprint index from a file to the provided idx.
+ */
 void load_file(const char *fname, struct index *idx)
 {
   FILE *f = fopen(fname, "r");
@@ -89,30 +116,38 @@ void cleanup_idx(struct index *idx)
   free(idx->paths);
 }
 
+
+
 /**
- * An iterator for hash_entries of a specified hash value
+ * Initialize an iterator for a certain hash value of a given index.
+ * An index can contain more than one hash of the same value.
+ *
+ * Q: Why is an entry passed as argument and not just the hash value?
+ * A: Because we can utilize hash_cmp which operates on hash_entry_t*.
  */
-struct hash_iter {
-  hash_entry_t *ptr;
-};
-
-
 void hash_iter_init(struct hash_iter *it, struct index *idx,
     hash_entry_t *entry)
 {
   it->ptr = bsearch(entry, idx->hashes, idx->hash_cnt, sizeof(hash_entry_t),
       (int (*)(const void *, const void *))hash_cmp);
-
+  // find the first hash of a certain value (bsearch found any)
   if (it->ptr != NULL) {
-    // find first
     while (hash_cmp(&it->ptr->hash, &(it->ptr-1)->hash) == 0) it->ptr--;
   }
+
+  // store the last of the hashes to avoid indexing out of bounds
+  // while iterating
+  it->last = (idx->hash_cnt > 0) ? &idx->hashes[idx->hash_cnt - 1] : NULL;
 }
 
+/**
+ * Get the next element from the iterator, or NULL if there is no more.
+ */
 hash_entry_t *hash_iter_next(struct hash_iter *it)
 {
   hash_entry_t *res = it->ptr;
-  if (it->ptr != NULL && hash_cmp(&it->ptr->hash, &(it->ptr+1)->hash) == 0) {
+  if (it->ptr != NULL && it->ptr != it->last &&
+      hash_cmp(&it->ptr->hash, &(it->ptr+1)->hash) == 0) {
     it->ptr++;
   } else {
     it->ptr = NULL;
@@ -120,6 +155,13 @@ hash_entry_t *hash_iter_next(struct hash_iter *it)
   return res;
 }
 
+
+/**
+ * Print a matching region to stdout in the format:
+ * file1:start1,count1 -- file2:start2,count2
+ *
+ * start and count are line numbers.
+ */
 void record(int match_size,
     char *fname1, int beg1, int end1,
     char *fname2, int beg2, int end2)
@@ -131,6 +173,16 @@ void record(int match_size,
   }
 }
 
+
+/**
+ * "Construct" idx_tgt from idx_src by finding matching regions for prefixes
+ * of idx_tgt in idx_src.
+ *
+ * The altorihm is based on following report, except we have binary search
+ * for finding prefixes in the source.
+ * Walter Tichy, "The String-to-String Correction Problem with
+ * Block Moves" (1983).
+ */
 void construct_target(struct index *idx_src, struct index *idx_tgt)
 {
   // iterate target in input order
@@ -200,7 +252,7 @@ int main(int argc, char *argv[])
       case 'm':
         if (opt_m++ > 0) usage();
         min_region_size = parse_num(optarg);
-        if (min_region_size < 0) usage();
+        if (min_region_size < 1) usage();
         break;
       case '?':
       default:

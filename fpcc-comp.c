@@ -303,8 +303,9 @@ void count(int *nboth, int *nexcl, sig_t *s0, sig_t *s1, sig_t *sb)
     if (cmp == 0) {
       lboth++;
       // check against the base file
-      while (ib < sb->count && sb->hashes[ib] < s0->hashes[i0]) ib++;
-      if (ib < sb->count && sb->hashes[ib] == s0->hashes[i0]) {
+      while (ib < sb->count &&
+          hash_cmp(&sb->hashes[ib], &s0->hashes[i0]) < 0) ib++;
+      if (ib < sb->count && hash_cmp(&sb->hashes[ib], &s0->hashes[i0]) == 0) {
         lexcl++;
         ib++;
       }

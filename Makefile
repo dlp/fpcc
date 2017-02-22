@@ -2,8 +2,13 @@
 SHELL := /bin/bash
 
 CC = gcc
-CFLAGS = -std=c99 -pedantic -Wall -g -D_DEFAULT_SOURCE -DDEBUG
+CFLAGS = -std=c99 -pedantic -Wall -g -D_DEFAULT_SOURCE
 LDFLAGS =
+
+ifeq ($(DEBUG),1)
+  CFLAGS += -DDEBUG
+endif
+
 
 .PHONY: all clean
 
