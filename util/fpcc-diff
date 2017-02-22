@@ -1,15 +1,75 @@
 #!/bin/bash
+###############################################################################
+#
+# fpcc-diff - Display matching sections of two files
+#
+# In order to use highlighting (excludes side-by-side view),
+# the source-highlight tool is required:
+#   sudo apt-get install source-highlight
+#
+# 2017, Daniel Prokesch <daniel.prokesch@gmail.com>
+###############################################################################
+
+SIDEBYSIDE=0
+
+# number of lines before and after a match
+CONTEXT=2
 
 
-# sudo apt-get install source-highlight
-# highlight C source code in file.c to terminal, with line numbering
-source-highlight -n -s C -f esc256 --line-range="$1-$2" -i file.c
+while getopts "y" opt; do
+  case $opt in
+    y) SIDEBYSIDE=1 ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      ;;
+  esac
+done
+shift $((OPTIND-1))
 
 
-# for side-by-side comparison, coloring does not work:
+# arguments: filename, startline, length
+function section {
+  local fname="$(cd $(dirname $1); pwd)/$(basename $1)"
+  local start=$(( $2 - ${CONTEXT} ))
+  local end=$(( $2 + $3 + ${CONTEXT} ))
 
-# print only lines in specified range, with nice numbering
-awk "NR>=$1 && NR<=$2 {print \$0 }" <(nl -ba file.c)
+  if [[ -f "${fname}" ]]
+  then
+    printf "\n%s %d-%d\n\n" "${fname}" ${start} ${end}
+    if [[ ${SIDEBYSIDE} -ne 0 ]] || ! which source-highlight
+    then
+      # print only lines in specified range, with nice numbering
+      awk "NR>=${start} && NR<=${end} {print \$0 }" <(nl -ba -s"  " ${fname})
+    else
+      # highlight C source code to terminal, with line numbering
+      source-highlight -n -s C -f esc --line-range="${start}-${end}" -i ${fname}
+    fi
+  fi
+}
 
-# Display two files side by side, use terminal width
-pr -mt -w ${COLUMNS} file1 file2
+
+RE="(.+):([[:digit:]]+),([[:digit:]]+) -- (.+):([[:digit:]]+),([[:digit:]]+)"
+while read line
+do
+  if [[ ${line} =~ ${RE} ]]
+  then
+    # line
+    printf '\n%*s\n' "$(tput cols)" '' | tr ' ' '-'
+
+    if [[ ${SIDEBYSIDE} -ne 0 ]]
+    then
+      # Display two files side by side, use terminal width
+      pr -mt -w $(tput cols) \
+        <(section ${BASH_REMATCH[@]:1:3}) \
+        <(section ${BASH_REMATCH[@]:4:3})
+    else
+        section ${BASH_REMATCH[@]:1:3}
+        section ${BASH_REMATCH[@]:4:3}
+    fi
+  fi
+done
+
+exit
+
+
+
