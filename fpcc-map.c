@@ -8,7 +8,24 @@
  * file1:start1,count1 -- file2:start2,count2
  * where start and count are line numbers.
  *
- * Author: Daniel Prokesch <daniel.prokesch@gmail.com>
+ * Two algorithms are implemented:
+ *
+ * 1) String-to-String Correction (STSC)
+ *    see
+ *    - Walter Tichy, "The String-to-String Correction Problem with
+ *      Block Moves" (1983).
+ *      (http://docs.lib.purdue.edu/cgi/viewcontent.cgi?article=1377&context=cstech)
+ *
+ * 2) Iterated Longest Common Substring (ILCS)
+ *    see
+ *    - https://en.wikipedia.org/wiki/Longest_common_substring_problem#Dynamic_programming
+ *    - http://stackoverflow.com/a/10067660/5949973
+ *
+ * Benchmarked: ILCS is about 23 times slower than STSC.
+ * It would be nice to see the situation when GSTs are used for ILCS
+ * instead of dynamic programming.
+ *
+ * (c) 2017, Daniel Prokesch <daniel.prokesch@gmail.com>
  */
 #include <assert.h>
 #include <errno.h>
@@ -31,28 +48,23 @@ struct index {
   char **paths;
 };
 
-
-/**
- * An iterator for hash_entries of a specified hash value
- */
-struct hash_iter {
-  // invariant: ptr points to the next element,
-  // last to the last of all available hashes
-  hash_entry_t *ptr, *last;
-};
-
 // Matching regions (consecutive hashes) below this value are not emitted.
 // The units are number of hashes.
 static int min_region_size = DEFAULT_MIN_REGION_SIZE;
 
+// the two implemented alternative algorithms
+void string_to_string(struct index *, struct index *);
+void iterated_lcs(struct index *, struct index *);
+
 
 void usage(void)
 {
-  (void) fprintf(stderr, "USAGE: %s [-m min_region_size] file1 file2\n",
+  (void) fprintf(stderr, "USAGE: %s [-l] [-m min_region_size] file1 file2\n",
       program_name);
   (void) fprintf(stderr, "\nOptions:\n"
-      "  min_region_size ... matching regions (consecutive hashes) below\n"
-      "                      this value are not emitted. Default: %d\n",
+      "  -l                 ... use ILCS instead of the default STSC\n"
+      "  -m min_region_size ... matching regions (consecutive hashes) below\n"
+      "                         this value are not emitted. Default: %d\n",
       DEFAULT_MIN_REGION_SIZE);
   exit(EXIT_FAILURE);
 }
@@ -116,7 +128,78 @@ void cleanup_idx(struct index *idx)
   free(idx->paths);
 }
 
+/**
+ * Print a matching region to stdout in the format:
+ * file1:start1,count1 -- file2:start2,count2
+ *
+ * start and count are line numbers.
+ */
+void record(int match_size,
+    char *fname1, int beg1, int end1,
+    char *fname2, int beg2, int end2)
+{
+  if (match_size >= min_region_size) {
+    ssize_t res = printf("%s:%d,%d -- %s:%d,%d\n",
+        fname1, beg1, end1-beg1, fname2, beg2, end2-beg2);
+    if (res < 0) {
+      error_exit("cannot output match");
+    }
+  }
+}
 
+
+int main(int argc, char *argv[])
+{
+  int opt_l = 0, opt_m = 0;
+  int c;
+  while ((c = getopt(argc, argv, "lm:")) != -1) {
+    switch (c) {
+      case 'l':
+        if (opt_l++ > 0) usage();
+        break;
+      case 'm':
+        if (opt_m++ > 0) usage();
+        min_region_size = parse_num(optarg);
+        if (min_region_size < 1) usage();
+        break;
+      case '?':
+      default:
+        usage();
+    }
+  }
+  // exactly two arguments
+  if (argc - optind != 2) usage();
+
+  struct index idx1, idx2;
+  load_file(argv[optind], &idx1);
+  load_file(argv[optind + 1], &idx2);
+
+  if (opt_l > 0) {
+    iterated_lcs(&idx2, &idx1);
+  } else {
+    string_to_string(&idx2, &idx1);
+  }
+
+  cleanup_idx(&idx1);
+  cleanup_idx(&idx2);
+
+  exit(EXIT_SUCCESS);
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Algorithm 1: String-to-String Correction
+///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * An iterator for hash_entries of a specified hash value
+ */
+struct hash_iter {
+  // invariant: ptr points to the next element,
+  // last to the last of all available hashes
+  hash_entry_t *ptr, *last;
+};
 
 /**
  * Initialize an iterator for a certain hash value of a given index.
@@ -155,35 +238,14 @@ hash_entry_t *hash_iter_next(struct hash_iter *it)
   return res;
 }
 
-
 /**
- * Print a matching region to stdout in the format:
- * file1:start1,count1 -- file2:start2,count2
+ * The String-To-String Correction algorithm works by finding maximal
+ * subchains in source to "construct" target.
  *
- * start and count are line numbers.
- */
-void record(int match_size,
-    char *fname1, int beg1, int end1,
-    char *fname2, int beg2, int end2)
-{
-  ssize_t res = printf("%s:%d,%d -- %s:%d,%d\n",
-      fname1, beg1, end1-beg1, fname2, beg2, end2-beg2);
-  if (res < 0) {
-    error_exit("cannot output match");
-  }
-}
-
-
-/**
- * "Construct" idx_tgt from idx_src by finding matching regions for prefixes
- * of idx_tgt in idx_src.
- *
- * The altorihm is based on following report, except we have binary search
+ * In contrast to the original report, we have binary search
  * for finding prefixes in the source.
- * Walter Tichy, "The String-to-String Correction Problem with
- * Block Moves" (1983).
  */
-void construct_target(struct index *idx_src, struct index *idx_tgt)
+void string_to_string(struct index *idx_src, struct index *idx_tgt)
 {
   // iterate target in input order
   int k = idx_tgt->hashes[0].next;
@@ -231,53 +293,99 @@ void construct_target(struct index *idx_src, struct index *idx_tgt)
       DBG("chain length: %d\n", count);
     }
     DBG("best chain length: %d\n", best_count);
-    // record region if it has substantial size
-    if (best_count >= min_region_size) {
-      record(best_count,
-          idx_src->paths[best_src->filecnt],
-          best_src->linepos, best_src_end->linepos,
-          idx_tgt->paths[tgt->filecnt], tgt->linepos, tgt_end->linepos
-          );
-    }
+    record(best_count,
+        idx_src->paths[best_src->filecnt],
+        best_src->linepos, best_src_end->linepos,
+        idx_tgt->paths[tgt->filecnt], tgt->linepos, tgt_end->linepos
+        );
     k = tgt_end->next;
   }
 }
 
-void common_substring(struct index *idx_src, struct index *idx_tgt)
+
+///////////////////////////////////////////////////////////////////////////////
+// Algorithm 2: Iterated Longest Common Substring
+///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Supplemental data element for hash entry
+ */
+struct hash_entry_suppl {
+  int prev; // index of the previous hash in the chain
+  int term; // terminator flag indicates chain boundaries
+};
+
+/**
+ * Create an array of hash_entry_suppl the same size as the number of
+ * hash_entries in the index, and initialize it.
+ */
+struct hash_entry_suppl *suppl_create(struct index *idx)
+{
+  struct hash_entry_suppl *suppl =
+    malloc(idx->hash_cnt * sizeof(struct hash_entry_suppl));
+
+  // iterate once through the hashes in order and
+  // store the previous pointer and set the term flag
+  // upon change of the filename
+  for (int previ = 0, curi = idx->hashes[0].next; curi > 0;
+      previ = curi, curi = idx->hashes[curi].next) {
+    suppl[curi ].prev = previ;
+    suppl[previ].term =
+      (idx->hashes[previ].filecnt != idx->hashes[curi].filecnt);
+  }
+  return suppl;
+}
+
+/**
+ * Unlink a subchain from the hashes chain.
+ * The subchain is specified via its begin and end index.
+ */
+void unlink_subchain(hash_entry_t *hashes, struct hash_entry_suppl *suppl,
+    int ibegin, int iend)
+{
+  // link the predecessor of ibegin to the successor of iend
+  hashes[suppl[ibegin].prev].next = hashes[iend].next;
+  // set the terminate flag for the predecessor of ibegin
+  suppl[suppl[ibegin].prev].term = 1;
+  // link the successor of iend to the predecessor of ibegin (prev-link)
+  suppl[hashes[iend].next].prev = suppl[ibegin].prev;
+}
+
+
+/**
+ * The Iterated Longest Common Substring algorithm will repeatedly search
+ * for the longest common chain in the chain of hashes and remove it
+ * from both chains.
+ *
+ * Removal of a chain creates boundaries that are managed via termination flags
+ * in a supplemental data structure, along with prev-pointers (a doubly-linked
+ * list is easier to handle).
+ *
+ */
+void iterated_lcs(struct index *idx_src, struct index *idx_tgt)
 {
   int longest;
-  hash_entry_t *hs = idx_src->hashes, *ht = idx_tgt->hashes;
-
 
   // actual and last row of the dynamic programming table
   int *dp0 = malloc(idx_tgt->hash_cnt * sizeof(int));
   int *dp1 = malloc(idx_tgt->hash_cnt * sizeof(int));
 
-  // prepare supplemental data structures
-  struct suppl {
-    int prev;
-    int term;
-  };
+  // create supplemental data structures
+  struct hash_entry_suppl *suppls = suppl_create(idx_src),
+                          *supplt = suppl_create(idx_tgt);
 
-  struct suppl *suppls = malloc(idx_src->hash_cnt * sizeof(struct suppl));
-  struct suppl *supplt = malloc(idx_tgt->hash_cnt * sizeof(struct suppl));
-  for (int ps = 0, ks = hs[0].next; ks > 0; ps = ks, ks = hs[ks].next) {
-    suppls[ks].prev = ps;
-    suppls[ps].term = (hs[ps].filecnt != hs[ks].filecnt);
-  }
-  for (int pt = 0, kt = ht[0].next; kt > 0; pt = kt, kt = ht[kt].next) {
-    supplt[kt].prev = pt;
-    supplt[pt].term = (ht[pt].filecnt != ht[kt].filecnt);
-  }
-
-
+  hash_entry_t *hs = idx_src->hashes, *ht = idx_tgt->hashes;
   do {
+    // these indices will point to the end of a matching region in both hashes
     int ls, lt;
     longest = 0;
-    for (int ps = 0, ks = hs[0].next; ks > 0; ps = ks, ks = hs[ks].next) {
-      // swap pointers
+    for (int ks = hs[0].next; ks > 0; ks = hs[ks].next) {
+      int ps = suppls[ks].prev;
+      // swap pointers: dp0 gets dp1,
+      // dp1 is the fresh row, its contents are discarded
       int *tmp = dp0; dp0 = dp1; dp1 = tmp;
-      for (int pt = 0, kt = ht[0].next; kt > 0; pt = kt, kt = ht[kt].next) {
+      for (int kt = ht[0].next; kt > 0; kt = ht[kt].next) {
+        int pt = supplt[kt].prev;
         if (hash_cmp(&hs[ks], &ht[kt]) == 0) {
           if (suppls[ps].term != 0 || supplt[pt].term != 0) {
             dp1[kt] = 1;
@@ -295,9 +403,10 @@ void common_substring(struct index *idx_src, struct index *idx_tgt)
         }
       }
     }
-    // record region if it has substantial size
-    if (longest >= min_region_size) {
-      // discover matching region from back to front
+
+    if (longest > 0) {
+      // Discover the matching region from back to front.
+      // This is the real motivation for the prev-links.
       int ks = ls, kt = lt;
       for (int i = 1; i < longest; i++) {
         ks = suppls[ks].prev;
@@ -310,12 +419,12 @@ void common_substring(struct index *idx_src, struct index *idx_tgt)
           );
 
       // cut out the chains
-      hs[suppls[ks].prev].next = hs[ls].next;
-      suppls[suppls[ks].prev].term = 1;
-      ht[supplt[kt].prev].next = ht[lt].next;
-      supplt[supplt[kt].prev].term = 1;
+      unlink_subchain(hs, suppls, ks, ls);
+      unlink_subchain(ht, supplt, kt, lt);
     }
-  } while (longest >= min_region_size);
+  } while (longest > 0);
+
+  // cleanup the dyn-prog table rows and the supplemental data structures
   free(dp0);
   free(dp1);
   free(suppls);
@@ -323,36 +432,3 @@ void common_substring(struct index *idx_src, struct index *idx_tgt)
 }
 
 
-int main(int argc, char *argv[])
-{
-  int opt_m = 0;
-  int c;
-  while ((c = getopt(argc, argv, "m:")) != -1) {
-    switch (c) {
-      case 'm':
-        if (opt_m++ > 0) usage();
-        min_region_size = parse_num(optarg);
-        if (min_region_size < 1) usage();
-        break;
-      case '?':
-      default:
-        usage();
-    }
-  }
-  // exactly two arguments
-  if (argc - optind != 2) usage();
-
-  struct index idx1, idx2;
-  load_file(argv[optind], &idx1);
-  load_file(argv[optind + 1], &idx2);
-
-  // use Tichy's algorithm for finding maximal string moves
-  //construct_target(&idx2, &idx1);
-  //
-  common_substring(&idx2, &idx1);
-
-  cleanup_idx(&idx1);
-  cleanup_idx(&idx2);
-
-  exit(EXIT_SUCCESS);
-}
