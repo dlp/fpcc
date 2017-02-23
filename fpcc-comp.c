@@ -16,7 +16,7 @@
 typedef struct {
   char *fname; // filename
   unsigned count; //  number of hashes
-  hash_t *hashes; // pointer to array of hashes
+  hash_entry_t *hashes; // pointer to array of hashes
 } sig_t;
 
 const char *program_name = "fpcc-comp";
@@ -242,7 +242,7 @@ void load(const char *fname, sig_t *sig)
 {
   FILE *f;
   uint32_t hash_count;
-  hash_t *hash_buf;
+  hash_entry_t *hash_buf;
 
   f = fopen(fname, "r");
   if (f == NULL) {
@@ -259,22 +259,15 @@ void load(const char *fname, sig_t *sig)
         program_name, fname);
     exit(EXIT_FAILURE);
   }
-  hash_buf = malloc((hash_count - 1) * sizeof(hash_t));
+  hash_buf = malloc(hash_count * sizeof(hash_entry_t));
   if (hash_buf == NULL) {
     error_exit("can't allocate buffer");
   }
-  for (int i = 0; i < hash_count; i++) {
-    hash_entry_t entry;
-    if (fread(&entry, sizeof(hash_entry_t), 1, f) != 1) {
-      (void) fprintf(stderr, "%s: error reading %s\n",
-          program_name, fname);
-      exit(EXIT_FAILURE);
-    }
-    // the first entry is a dummy entry, which we have to skip
-    if (i > 0) {
-      DBG("%016lx\n", entry.hash);
-      hash_buf[i-1] = entry.hash;
-    }
+  if (fread(hash_buf, sizeof(hash_entry_t),
+        hash_count, f) != hash_count) {
+    (void) fprintf(stderr, "%s: error reading %s\n",
+        program_name, fname);
+    exit(EXIT_FAILURE);
   }
   (void) fclose(f);
 

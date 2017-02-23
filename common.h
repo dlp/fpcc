@@ -35,6 +35,6 @@ void error_exit(const char *msg);
 
 long int parse_num(const char *s);
 
-int hash_cmp(const hash_t *h1, const hash_t *h2);
+int hash_cmp(const hash_entry_t *h1, const hash_entry_t *h2);
 
 #endif // _COMMON_H_

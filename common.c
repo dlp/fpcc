@@ -29,9 +29,9 @@ long int parse_num(const char *s)
 }
 
 
-int hash_cmp(const hash_t *h1, const hash_t *h2)
+int hash_cmp(const hash_entry_t *h1, const hash_entry_t *h2)
 {
-  if (*h1 < *h2) return -1;
-  if (*h1 > *h2) return 1;
+  if (h1->hash < h2->hash) return -1;
+  if (h1->hash > h2->hash) return 1;
   return 0;
 }

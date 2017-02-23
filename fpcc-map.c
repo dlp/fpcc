@@ -1,5 +1,5 @@
 /**
- * fpcc-map - Show similar regions in files.
+ * fpcc-map - Find similar regions in files.
  *
  * Takes two fingerprint indices and finds common regions,
  * that is, consecutive matching hashes.
@@ -132,7 +132,7 @@ void hash_iter_init(struct hash_iter *it, struct index *idx,
       (int (*)(const void *, const void *))hash_cmp);
   // find the first hash of a certain value (bsearch found any)
   if (it->ptr != NULL) {
-    while (hash_cmp(&it->ptr->hash, &(it->ptr-1)->hash) == 0) it->ptr--;
+    while (hash_cmp(it->ptr, it->ptr-1) == 0) it->ptr--;
   }
 
   // store the last of the hashes to avoid indexing out of bounds
@@ -147,7 +147,7 @@ hash_entry_t *hash_iter_next(struct hash_iter *it)
 {
   hash_entry_t *res = it->ptr;
   if (it->ptr != NULL && it->ptr != it->last &&
-      hash_cmp(&it->ptr->hash, &(it->ptr+1)->hash) == 0) {
+      hash_cmp(it->ptr, it->ptr+1) == 0) {
     it->ptr++;
   } else {
     it->ptr = NULL;
@@ -212,7 +212,7 @@ void construct_target(struct index *idx_src, struct index *idx_tgt)
         tn = &idx_tgt->hashes[t->next];
         if (sn->filecnt == s->filecnt &&
             tn->filecnt == t->filecnt &&
-            hash_cmp(&sn->hash, &tn->hash) == 0) {
+            hash_cmp(sn, tn) == 0) {
           // extend the chain
           s = sn;
           t = tn;
@@ -243,6 +243,86 @@ void construct_target(struct index *idx_src, struct index *idx_tgt)
   }
 }
 
+void common_substring(struct index *idx_src, struct index *idx_tgt)
+{
+  int longest;
+  hash_entry_t *hs = idx_src->hashes, *ht = idx_tgt->hashes;
+
+
+  // actual and last row of the dynamic programming table
+  int *dp0 = malloc(idx_tgt->hash_cnt * sizeof(int));
+  int *dp1 = malloc(idx_tgt->hash_cnt * sizeof(int));
+
+  // prepare supplemental data structures
+  struct suppl {
+    int prev;
+    int term;
+  };
+
+  struct suppl *suppls = malloc(idx_src->hash_cnt * sizeof(struct suppl));
+  struct suppl *supplt = malloc(idx_tgt->hash_cnt * sizeof(struct suppl));
+  for (int ps = 0, ks = hs[0].next; ks > 0; ps = ks, ks = hs[ks].next) {
+    suppls[ks].prev = ps;
+    suppls[ps].term = (hs[ps].filecnt != hs[ks].filecnt);
+  }
+  for (int pt = 0, kt = ht[0].next; kt > 0; pt = kt, kt = ht[kt].next) {
+    supplt[kt].prev = pt;
+    supplt[pt].term = (ht[pt].filecnt != ht[kt].filecnt);
+  }
+
+
+  do {
+    int ls, lt;
+    longest = 0;
+    for (int ps = 0, ks = hs[0].next; ks > 0; ps = ks, ks = hs[ks].next) {
+      // swap pointers
+      int *tmp = dp0; dp0 = dp1; dp1 = tmp;
+      for (int pt = 0, kt = ht[0].next; kt > 0; pt = kt, kt = ht[kt].next) {
+        if (hash_cmp(&hs[ks], &ht[kt]) == 0) {
+          if (suppls[ps].term != 0 || supplt[pt].term != 0) {
+            dp1[kt] = 1;
+          } else {
+            dp1[kt] = dp0[pt] + 1;
+          }
+          if (dp1[kt] >= longest) {
+            longest = dp1[kt];
+            // store the indices of the end of the longest match
+            ls = ks;
+            lt = kt;
+          }
+        } else {
+          dp1[kt] = 0;
+        }
+      }
+    }
+    // record region if it has substantial size
+    if (longest >= min_region_size) {
+      // discover matching region from back to front
+      int ks = ls, kt = lt;
+      for (int i = 1; i < longest; i++) {
+        ks = suppls[ks].prev;
+        kt = supplt[kt].prev;
+      }
+
+      record(longest,
+          idx_src->paths[hs[ks].filecnt], hs[ks].linepos, hs[ls].linepos,
+          idx_tgt->paths[ht[kt].filecnt], ht[kt].linepos, ht[lt].linepos
+          );
+
+      // cut out the chains
+      hs[suppls[ks].prev].next = hs[ls].next;
+      suppls[suppls[ks].prev].term = 1;
+      ht[supplt[kt].prev].next = ht[lt].next;
+      supplt[supplt[kt].prev].term = 1;
+    }
+  } while (longest >= min_region_size);
+  free(dp0);
+  free(dp1);
+  free(suppls);
+  free(supplt);
+}
+
+
 int main(int argc, char *argv[])
 {
   int opt_m = 0;
@@ -267,7 +347,9 @@ int main(int argc, char *argv[])
   load_file(argv[optind + 1], &idx2);
 
   // use Tichy's algorithm for finding maximal string moves
-  construct_target(&idx2, &idx1);
+  //construct_target(&idx2, &idx1);
+  //
+  common_substring(&idx2, &idx1);
 
   cleanup_idx(&idx1);
   cleanup_idx(&idx2);
