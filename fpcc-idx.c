@@ -99,6 +99,9 @@ int main(int argc, char *argv[])
 {
   int opt_o=0;
   int c;
+
+  if (argc > 0) program_name = argv[0];
+
   while ((c = getopt(argc, argv, "o:")) != -1) {
     switch (c) {
       case 'o':

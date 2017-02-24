@@ -59,7 +59,7 @@ void iterated_lcs(struct index *, struct index *);
 
 void usage(void)
 {
-  (void) fprintf(stderr, "USAGE: %s [-l] [-m min_region_size] file1 file2\n",
+  (void) fprintf(stderr, "USAGE: %s [-l] [-m min_region_size] target source\n",
       program_name);
   (void) fprintf(stderr, "\nOptions:\n"
       "  -l                 ... use ILCS instead of the default STSC\n"
@@ -152,6 +152,9 @@ int main(int argc, char *argv[])
 {
   int opt_l = 0, opt_m = 0;
   int c;
+
+  if (argc > 0) program_name = argv[0];
+
   while ((c = getopt(argc, argv, "lm:")) != -1) {
     switch (c) {
       case 'l':
@@ -170,18 +173,21 @@ int main(int argc, char *argv[])
   // exactly two arguments
   if (argc - optind != 2) usage();
 
-  struct index idx1, idx2;
-  load_file(argv[optind], &idx1);
-  load_file(argv[optind + 1], &idx2);
+  struct index idx_source, idx_target;
 
+  load_file(argv[optind], &idx_target);
+  load_file(argv[optind + 1], &idx_source);
+
+  // decide on an algorithm
   if (opt_l > 0) {
-    iterated_lcs(&idx2, &idx1);
+    iterated_lcs(&idx_source, &idx_target);
   } else {
-    string_to_string(&idx2, &idx1);
+    // default algorithm
+    string_to_string(&idx_source, &idx_target);
   }
 
-  cleanup_idx(&idx1);
-  cleanup_idx(&idx2);
+  cleanup_idx(&idx_source);
+  cleanup_idx(&idx_target);
 
   exit(EXIT_SUCCESS);
 }
@@ -294,9 +300,10 @@ void string_to_string(struct index *idx_src, struct index *idx_tgt)
     }
     DBG("best chain length: %d\n", best_count);
     record(best_count,
+        idx_tgt->paths[tgt->filecnt],
+        tgt->linepos, tgt_end->linepos,
         idx_src->paths[best_src->filecnt],
-        best_src->linepos, best_src_end->linepos,
-        idx_tgt->paths[tgt->filecnt], tgt->linepos, tgt_end->linepos
+        best_src->linepos, best_src_end->linepos
         );
     k = tgt_end->next;
   }
@@ -414,8 +421,8 @@ void iterated_lcs(struct index *idx_src, struct index *idx_tgt)
       }
 
       record(longest,
-          idx_src->paths[hs[ks].filecnt], hs[ks].linepos, hs[ls].linepos,
-          idx_tgt->paths[ht[kt].filecnt], ht[kt].linepos, ht[lt].linepos
+          idx_tgt->paths[ht[kt].filecnt], ht[kt].linepos, ht[lt].linepos,
+          idx_src->paths[hs[ks].filecnt], hs[ks].linepos, hs[ls].linepos
           );
 
       // cut out the chains

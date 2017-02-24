@@ -43,7 +43,7 @@ void usage(void)
       "USAGE: %s [-b basefile] [-c|-i] [-t threshold] sigfile1 sigfile2\n",
       program_name);
   (void) fprintf(stderr,
-      "USAGE: %s [-b basefile] [-c|-i] [-t threshold] [-L filelist]\n",
+      "       %s [-b basefile] [-c|-i] [-t threshold] -L filelist\n",
       program_name);
   exit(EXIT_FAILURE);
 }
@@ -102,6 +102,8 @@ int main(int argc, char *argv[])
   const char *filelist = NULL;
   char *basefile = NULL;
 
+  if (argc > 0) program_name = argv[0];
+
   int c;
   while ((c = getopt(argc, argv, "b:cit:L:")) != -1) {
     switch (c) {
@@ -132,6 +134,7 @@ int main(int argc, char *argv[])
   }
   if (opt_c + opt_i > 1) usage();
 
+  // number of positional arguments
   int npargs = argc - optind;
 
   sig_t basesig = {.fname=NULL, .count=0, .hashes=NULL};

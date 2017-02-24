@@ -50,4 +50,4 @@ fpcc-map: fpcc-map.o common.o
 
 clean:
 	rm -f ccode.tab.{c,h} lex.yy.c *.o
-	rm -f fpcc-sig fpcc-comp fpcc-idx
+	rm -f fpcc-sig fpcc-comp fpcc-idx fpcc-map
