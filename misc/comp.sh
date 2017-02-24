@@ -1,11 +1,13 @@
 #!/bin/bash
 ###############################################################################
-# A basic comparison script
+# comp.sh - A basic comparison script
 #
 # Operates on textfiles, assumes hashes are sorted
 # Options:
 # -b basefile ... set of hashes to ignore
 # -t threshold ... do not output results if below threshold (default=0)
+#
+# (c)2017 Daniel Prokesch <daniel.prokesch@gmail.com>
 #
 ###############################################################################
 
@@ -30,7 +32,7 @@ then
   echo "At least two arguments are required!" >&2
 fi
 
-function similarity {
+function resemblance {
   local comm12="comm -12 $1 $2"
   local both=$(${comm12} | wc -l)
   local excl=0
@@ -42,13 +44,14 @@ function similarity {
 }
 
 function compare {
-  local val=$(similarity "$1" "$2" "${BASE}")
+  local val=$(resemblance "$1" "$2" "${BASE}")
   if [[ $val -ge ${THRESHOLD} ]]
   then
     echo "$1 and $2: $val%"
   fi
 }
 
+# compare all-to-all of the positional arguments
 for (( i=1 ; i<=$# ; i++ ))
 do
   for (( j=i+1 ; j<=$# ; j++ ))
