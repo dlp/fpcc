@@ -14,7 +14,8 @@ function general_usage {
 
 PREFIX=$(basename $0)
 TOOL=$1
-TOOL_EXEC="$0-${TOOL}"
+TOOL_EXEC="$(readlink -e $0)-${TOOL}"
+
 
 # assert the tool exists as executable
 [[ -x "${TOOL_EXEC}" ]] || general_usage
