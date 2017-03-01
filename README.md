@@ -4,21 +4,32 @@ fpcc - Fingerprint C Code
 
 A set of tools to detect similarities between C source files.
 
-To compare two source code files, first create their fingerprints with `csig`.
-Then use `comp` to compare those fingerprints.
+Tool overview:
+
+* `sig` : create fingerprints of C source files
+* `idx` : create an index of the fingerprints
+* `comp`: compare indices for [resemblance and containment][4], score in %
+* `map` : find similar regions based on the indices
+* `diff`: show similar regions given the output of `map`
+* `help`: display help for a tool
+
+
+
+To compare two source code files, first create their fingerprints with
+`fpcc sig`.  Create an index with `idx` and  use `comp` to compare those
+fingerprints and/or find similar regions with `map`+`diff`.
+
 
 The tools are based on `sig` and `comp`, two [programs attributed to Rob
 Pike][1].
-As frontend/preprocessor, a C lexer is used, based on a freely available
-[C grammar][2].  It creates n-grams from lexical tokens, i.e., their IDs as
-defined by the yacc spec. This way, variable names, literal values, formatting,
-etc is ignored. The scanner also ignores comments and preprocessor directives.
-The set of hashes that comprises the fingerprint is selected based on
-winnowing, as described by [Schleimer, Wilkerson, Aiken, "Winnowing: Local
+
+As frontend/preprocessor (in `sig`), a C lexer is used, based on a freely
+available [C grammar][2].  It creates n-grams from lexical tokens, i.e., their
+IDs as defined by the yacc spec. This way, variable names, literal values,
+formatting, etc is ignored. The scanner also ignores comments and preprocessor
+directives.  The set of hashes that comprises the fingerprint is selected based
+on winnowing, as described by [Schleimer, Wilkerson, Aiken, "Winnowing: Local
 Algorithms for Document Fingerprinting"][3].
-Another earlier paper by [Andrei Broder, "On the resemblance and containment
-of documents"][4] gives additional background on
-document fingerprinting.
 
 
 Requirements
@@ -39,25 +50,17 @@ Usage
   ```
   SYNOPSIS
 
-  fpcc-sig [-n chainlength] [-w winnow] [-o outfile] file...
-    defaults: chainlength=5 winnow=4
-
   fpcc-comp [-b basefile] [-c|-i] [-t threshold] sigfile1 sigfile2
   fpcc-comp [-b basefile] [-c|-i] [-t threshold] [-L filelist]
     defaults: threshold=0
   ```
 
-`fpcc-sig` takes one or more C source files and computes hashes
-(= a fingerprint) from their concatenation.
 
 fpcc-comp compares the specified fingerprints and reports a quantitative
 similarity.
 
 Options:
 
--n chainlength ... number of tokens to form n-grams
--w winnow ... window size of the winnowing algorithm
--o outfile ... write to specified file instead of stdout
 
 -b basefile ... the fingerprint of which hashes are ignored
 -c ... output comparison results in a csv-format file1;file2;rb;ct1;ct2, where
@@ -71,8 +74,8 @@ Options:
 -L filelist ... path to a file containing the list of files to compare to
                 each other, Each path must be on a separate line.
 
-Howto
------
+Quickstart
+----------
 
 Assume you want to compute resemblance of documents.
 
@@ -109,11 +112,6 @@ The author seems to be Lachlan "Loki" Patrick; however, the tools seem to be
 unmaintained for a long time.
 
 
-License
--------
-
-I release the rewritten tools under the MIT License (see LICENSE).
-
 
 Deviations from the original sig and comp
 -----------------------------------------
@@ -145,17 +143,36 @@ Following changes were made:
   - they read and write binary data
   - sorting is moved from comp to sig, performed before writing
 
+
+License
+-------
+
+I release the rewritten tools under the MIT License (see LICENSE).
+
 ---
 
 Contact: Daniel Prokesch
   daniel.prokesch (at) gmail.com
 
----
 
 References
----
+----------
 
-Tichy, Walter F.,
+Saul Schleimer, Daniel S. Wilkerson, and Alex Aiken,
+"Winnowing: local algorithms for document fingerprinting" (2003)
+In Proceedings of the 2003 ACM SIGMOD international conference on Management
+of data (SIGMOD '03)
+DOI=http://dx.doi.org/10.1145/872757.872770
+https://theory.stanford.edu/~aiken/publications/papers/sigmod03.pdf
+
+Andrei Broder,
+"On the Resemblance and Containment of Documents" (1997)
+In Proceedings of the Compression and Complexity of Sequences 1997
+(SEQUENCES '97)
+https://pdfs.semanticscholar.org/b2ec/74c72d99b755325dc470dec2949d69cd4d57.pdf
+
+
+Walter F. Tichy,
 "The String-to-String Correction Problem with Block Moves" (1983).
 Computer Science Technical Reports. Paper 378.
 http://docs.lib.purdue.edu/cstech/378

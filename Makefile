@@ -10,7 +10,7 @@ ifeq ($(DEBUG),1)
 endif
 
 
-.PHONY: all clean
+.PHONY: all clean doc
 
 all: fpcc-sig fpcc-comp fpcc-idx fpcc-map
 
@@ -48,6 +48,10 @@ fpcc-map.o: common.h
 fpcc-map: fpcc-map.o common.o
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
+doc:
+	$(MAKE) -C $@
+
 clean:
 	rm -f ccode.tab.{c,h} lex.yy.c *.o
 	rm -f fpcc-sig fpcc-comp fpcc-idx fpcc-map
+	$(MAKE) -C doc clean

@@ -1,0 +1,19 @@
+#!/bin/bash
+###############################################################################
+
+function usage {
+  echo "fpcc help tool"
+  exit 0
+}
+
+[[ $# -eq 1  ]] || usage
+
+TOOL=$1
+DOCFILE=doc/${TOOL}.1.gz
+
+if [[ -f "${DOCFILE}" ]]
+then
+  exec man -l "${DOCFILE}"
+else
+  echo "no help for tool '${TOOL}' available" >&2
+fi
