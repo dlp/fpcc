@@ -2,7 +2,7 @@
 TOOLBOX=fpcc
 
 #TARGETS=$(addsuffix .1.gz, sig idx comp map diff help)
-TARGETS=$(addsuffix .1.gz, sig)
+TARGETS=$(addsuffix .1.gz, sig comp)
 
 .PHONY: all clean
 

@@ -37,66 +37,37 @@ Requirements
 
 The frontend uses a grammar, it requires `flex` and `bison`.
 As hash function the simple MD5 algorithm is used (openssl/md5.h).
+For the documentation, man pages are created with `txt2man`.
 In Ubuntu, to install the required packages, type
 ```bash
-sudo apt-get install flex bison libssl-dev
+sudo apt-get install flex bison libssl-dev txt2man
 ```
 To build the tools, simply type `make`.
 
-
-Usage
------
-
-  ```
-  SYNOPSIS
-
-  fpcc-comp [-b basefile] [-c|-i] [-t threshold] sigfile1 sigfile2
-  fpcc-comp [-b basefile] [-c|-i] [-t threshold] [-L filelist]
-    defaults: threshold=0
-  ```
-
-
-fpcc-comp compares the specified fingerprints and reports a quantitative
-similarity.
-
-Options:
-
-
--b basefile ... the fingerprint of which hashes are ignored
--c ... output comparison results in a csv-format file1;file2;rb;ct1;ct2, where
-       rb is resemblance of the two documents
-       ct1 is containment of file1 in file2
-       ct2 is containment of file2 in file1
-       rb,ct1,ct2 are in the range from 0 to 100.
--i ... compute containment instead of resemblance
-       (in csv format, both resemblance and containment are always computed)
--t threshold ... suppress reporting below the specified threshold
--L filelist ... path to a file containing the list of files to compare to
-                each other, Each path must be on a separate line.
 
 Quickstart
 ----------
 
 Assume you want to compute resemblance of documents.
 
-1. Create fingerprints for each source file you want to compare:
+1. Create fingerprint indices for each project you want to compare:
    ```bash
-   $ ./fpcc-sig -o mycfile1.sig mycfile1.c
-   $ ./fpcc-sig -o mycfile2.sig mycfile2.c
+   $ fpcc sig mycfile1.c | fpcc idx -o mycfile1.sig
+   $ fpcc sig mycfile2.c | fpcc idx -o mycfile2.sig
    ```
 2. Compare the fingerprints:
    ```bash
-   $ ./fpcc-comp mycfile1.sig mycfile2.sig
+   $ fpcc comp mycfile1.sig mycfile2.sig
    mycfile1.sig and mycfile2.sig: 34%
    ```
    You can also generate a list of signature files to perform an n-to-n
    comparison:
    ```bash
-   $ ./fpcc-sig -o mycfile3.sig mycfile2.c # a copy
+   $ fpcc sig mycfile2.c | fpcc idx -o mycfile3.sig # a copy
    $ echo mycfile1.sig > mylist.txt
    $ echo mycfile2.sig >> mylist.txt
    $ echo mycfile3.sig >> mylist.txt
-   $ ./fpcc-comp -L mylist.txt
+   $ fpcc comp -L mylist.txt
    mycfile1.sig and mycfile2.sig: 34%
    mycfile1.sig and mycfile3.sig: 34%
    mycfile2.sig and mycfile3.sig: 100%
@@ -144,10 +115,20 @@ Following changes were made:
   - sorting is moved from comp to sig, performed before writing
 
 
+Contribute
+----------
+
+In principle, all tools except `sig` (the "frontend") are source language
+agnostic.  One could extend `sig` to handle more than C source code.
+
+Reorganize and package the toolbox up, with proper configuration and
+installation.
+
+
 License
 -------
 
-I release the rewritten tools under the MIT License (see LICENSE).
+I release the toolbox under the MIT License (see LICENSE).
 
 ---
 
