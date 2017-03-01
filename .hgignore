@@ -6,5 +6,6 @@ ccode.tab.h
 lex.yy.c
 misc/sigcomp/comp
 misc/sigcomp/sig
-bin/*
+src/{sig,comp,idx,map}
+bin/
 doc/*.gz
