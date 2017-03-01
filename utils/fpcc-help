@@ -9,7 +9,7 @@ function usage {
 [[ $# -eq 1  ]] || usage
 
 TOOL=$1
-DOCFILE=doc/${TOOL}.1.gz
+DOCFILE=$(dirname $0)/../doc/${TOOL}.1.gz
 
 if [[ -f "${DOCFILE}" ]]
 then
