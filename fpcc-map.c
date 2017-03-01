@@ -330,6 +330,9 @@ struct hash_entry_suppl *suppl_create(struct index *idx)
 {
   struct hash_entry_suppl *suppl =
     malloc(idx->hash_cnt * sizeof(struct hash_entry_suppl));
+  if (suppl == NULL) {
+    error_exit("can't allocate buffer");
+  }
 
   // iterate once through the hashes in order and
   // store the previous pointer and set the term flag
@@ -372,10 +375,17 @@ void unlink_subchain(hash_entry_t *hashes, struct hash_entry_suppl *suppl,
 void iterated_lcs(struct index *idx_src, struct index *idx_tgt)
 {
   int longest;
+  int *dp0, *dp1;
 
   // actual and last row of the dynamic programming table
-  int *dp0 = malloc(idx_tgt->hash_cnt * sizeof(int));
-  int *dp1 = malloc(idx_tgt->hash_cnt * sizeof(int));
+  dp0 = malloc(idx_tgt->hash_cnt * sizeof(int));
+  if (dp0 == NULL) {
+    error_exit("can't allocate buffer");
+  }
+  dp1 = malloc(idx_tgt->hash_cnt * sizeof(int));
+  if (dp1 == NULL) {
+    error_exit("can't allocate buffer");
+  }
 
   // create supplemental data structures
   struct hash_entry_suppl *suppls = suppl_create(idx_src),
