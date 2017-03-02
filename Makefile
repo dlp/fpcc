@@ -7,26 +7,27 @@ TOOL_PREFIX=fpcc-
 C_TOOLS = $(addprefix src/, sig comp idx map)
 
 # fpcc tools which are scripts
-S_TOOLS = $(wildcard utils/*)
+S_TOOLS = $(addprefix utils/, fpcc-help fpcc-diff fpcc)
 
 # collect all into FPCC_TOOLS
 FPCC_TOOLS  = $(C_TOOLS:src/%=bin/$(TOOL_PREFIX)%)
 FPCC_TOOLS += $(S_TOOLS:utils/%=bin/%)
 
-.PHONY: all clean src doc
+SUBDIRS = src doc
 
-all: src doc
-	$(MAKE) $(FPCC_TOOLS)
+.PHONY: all clean $(SUBDIRS)
 
+all: $(SUBDIRS) $(FPCC_TOOLS)
+
+$(FPCC_TOOLS): $(SUBDIRS)
 
 bin/$(TOOL_PREFIX)%: src/%
 	install -D -T $< $@
 
-
 bin/%: utils/%
 	install -D $< $@
 
-src doc:
+$(SUBDIRS):
 	$(MAKE) -C $@
 
 clean:
