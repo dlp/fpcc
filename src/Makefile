@@ -13,12 +13,15 @@ C_TOOLS = sig comp idx map
 
 COMMON_OBJ = common.o
 
-.PHONY: all clean
+.PHONY: all clean release
 
 
 all: $(C_TOOLS)
 
 $(addsuffix .o, $(C_TOOLS)) common.o: common.h
+
+release: CFLAGS = -std=c99 -pedantic -Wall -O3 -D_DEFAULT_SOURCE -DNDEBUG
+release: $(C_TOOLS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<

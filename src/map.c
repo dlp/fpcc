@@ -108,7 +108,9 @@ void load_file(const char *fname, struct index *idx)
 
   size_t len = 0;
   for (int i = 0; i < idx->path_cnt; i++) {
-    (void) getdelim(&idx->paths[i], &len, '\0', f);
+    if (getdelim(&idx->paths[i], &len, '\0', f) == -1) {
+      goto fail;
+    }
   }
 
   (void) fclose(f);
@@ -295,16 +297,17 @@ void string_to_string(struct index *idx_src, struct index *idx_tgt)
         tgt_end = t;
         best_count = count;
       }
-      assert(count >= 0);
       DBG("chain length: %d\n", count);
     }
-    DBG("best chain length: %d\n", best_count);
-    record(best_count,
-        idx_tgt->paths[tgt->filecnt],
-        tgt->linepos, tgt_end->linepos,
-        idx_src->paths[best_src->filecnt],
-        best_src->linepos, best_src_end->linepos
-        );
+    if (best_count > 0) {
+      DBG("best chain length: %d\n", best_count);
+      record(best_count,
+          idx_tgt->paths[tgt->filecnt],
+          tgt->linepos, tgt_end->linepos,
+          idx_src->paths[best_src->filecnt],
+          best_src->linepos, best_src_end->linepos
+          );
+    }
     k = tgt_end->next;
   }
 }
@@ -394,7 +397,7 @@ void iterated_lcs(struct index *idx_src, struct index *idx_tgt)
   hash_entry_t *hs = idx_src->hashes, *ht = idx_tgt->hashes;
   do {
     // these indices will point to the end of a matching region in both hashes
-    int ls, lt;
+    int ls = -1, lt = -1;
     longest = 0;
     for (int ks = hs[0].next; ks > 0; ks = hs[ks].next) {
       int ps = suppls[ks].prev;
@@ -422,6 +425,7 @@ void iterated_lcs(struct index *idx_src, struct index *idx_tgt)
     }
 
     if (longest > 0) {
+      assert(ls >= 0 && ls >= 0);
       // Discover the matching region from back to front.
       // This is the real motivation for the prev-links.
       int ks = ls, kt = lt;
