@@ -1,0 +1,42 @@
+NAME
+  fpcc-idx - Create a fingerprint index for usage in comp and map
+
+SYNOPSIS
+  fpcc idx -o outfile
+
+DESCRIPTION
+  fpcc-idx(1) creates a fingerprint index from the hashes it reads on stdin.
+  These are produced by fpcc-sig(1).
+  The resulting index is used as input for the fpcc-comp(1) and fpcc-map(1)
+  tools.
+
+  fpcc-idx collects all the hashes from stdin, sorts them while keeping
+  a reference to the source file and building pointers such that the
+  original sequence of hashes can be restored.
+  The index is written in a binary format.
+  This allows for an efficient operation of fpcc-comp(1) and fpcc-map(1).
+
+OPTIONS
+  -o outfile   The filename of the resulting index.
+
+EXAMPLES
+  Directly piping the output from fpcc-sig(1) to fpcc-idx(1):
+
+    $ fpcc sig file1.c file2.c | fpcc idx -o myproj.sig
+
+  Using an intermediate file for the hashes:
+
+    $ fpcc sig file1.c >myproj.sigt
+    $ fpcc sig file2.c >>myproj.sigt
+    $ fpcc-idx -o myproy.sig <myproj.sigt
+
+  Using find to invoke fpcc-sig(1) for all C files found in the current
+  directory and its subdirectories and piping the output to fpcc-idx(1):
+
+    $ find . -name "*.c" -exec fpcc sig '{}' \\+ | fpcc idx -o myproj.sig
+
+SEE ALSO
+  fpcc-sig(1), fpcc-comp(1), fpcc-map(1)
+
+AUTHOR
+  Daniel Prokesch <daniel.prokesch@gmail.com>

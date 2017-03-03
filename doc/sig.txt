@@ -1,0 +1,33 @@
+NAME
+  fpcc-sig - Create fingerprints for C source code files
+
+SYNOPSIS
+  fpcc sig [-n chainlength] [-w winnow] file...
+
+DESCRIPTION
+  fpcc-sig computes hashes from lexical tokens from the C source files
+  provided as arguments, which form the fingerprints for the set of documents.
+  The output is written in plain text to stdout.
+  Input files are processed in order.
+  For each file, first the absolute, resolved canonical filename is printed,
+  followed by the hashes, one in each line together with the
+  approximate line number of its origin, separated by a single space.
+  The output of (possibly multiple) invocations of fpcc-sig can be directly
+  piped to fpcc-idx(1) to create an index for further use with, e.g.,
+  fpcc-comp(1).
+
+OPTIONS
+  -n chainlength  Number of tokens to form n-grams. Default: 5
+  -w winnow       Window size of the winnowing algorithm. Default: 4
+
+EXAMPLE
+  Using find to invoke fpcc-sig for all C files found in the current
+  directory and its subdirectories and piping the output to fpcc-idx(1):
+
+    $ find . -name "*.c" -exec fpcc sig '{}' \\+ | fpcc idx -o myproject.sig
+
+SEE ALSO
+  fpcc-idx(1), fpcc-comp(1)
+
+AUTHOR
+  Daniel Prokesch <daniel.prokesch@gmail.com>

@@ -3,22 +3,24 @@
 # FPCC wrapper
 ###############################################################################
 
-
-
-function general_usage {
-  echo "some general remarks and command list"
-  exit 0
-}
-
-[[ $# -ge 1  ]] || general_usage
-
 PREFIX=$(basename $0)
-TOOL=$1
+TOOL=${1-help}
 TOOL_EXEC="$(readlink -e $0)-${TOOL}"
 
 
-# assert the tool exists as executable
-[[ -x "${TOOL_EXEC}" ]] || general_usage
+# if the tool exists, invoke it
+if [[ -x "${TOOL_EXEC}" ]]
+then
+  shift
+  exec -a "${PREFIX} ${TOOL}" "${TOOL_EXEC}" $@
+fi
 
-shift
-exec -a "${PREFIX} ${TOOL}" "${TOOL_EXEC}" $@
+
+# otherwise, try to invoke help
+FPCC_HELP="$(readlink -e $0)-help"
+[[ -x "${FPCC_HELP}" ]] && exec "${FPCC_HELP}"
+
+# if we reach here, something is seriously broken
+echo "No "$(basename "${FPCC_HELP}")" found. " \
+  "Your fpcc installation seems to be broken." 2>&1
+exit 1

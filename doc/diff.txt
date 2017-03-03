@@ -1,0 +1,34 @@
+NAME
+  fpcc-diff - Display matching sections of two files
+
+SYNOPSIS
+  fpcc diff [-y] [target.sig source.sig]
+
+DESCRIPTION
+  fpcc-diff is a tool that interprets the output of fpcc-map(1) from
+  stdin and displays the respective regions.
+  If target.sig and source.sig are specified, instead of reading from
+  stdin it invokes fpcc-map(1) itself (with no options).
+
+  If the GNU source-highlight tool is installed, fpcc-diff uses
+  it to display the C source (unless -y is specified, because highlighting
+  messes up the two-column formatting).
+
+OPTIONS
+  -y  Enable side-by-side view (without highlighting only).
+
+EXAMPLES
+  Reading the output from fpcc-map(1) from stdin:
+
+    $ fpcc map myproj.sig otherproj.sig | fpcc diff
+
+  Invoke fpcc-map(1) implicitly:
+
+    $ fpcc diff myproj.sig otherproj.sig
+
+
+SEE ALSO
+  fpcc-map(1)
+
+AUTHOR
+  Daniel Prokesch <daniel.prokesch@gmail.com>

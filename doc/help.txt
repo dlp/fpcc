@@ -1,0 +1,15 @@
+NAME
+  fpcc-help - Display help information about fpcc
+
+SYNOPSIS
+  fpcc help tool
+
+DESCRIPTION
+  fpcc-help opens the man page for the specified tool to provide
+  more information about its invocation and use.
+
+SEE ALSO
+  man(7)
+
+AUTHOR
+  Daniel Prokesch <daniel.prokesch@gmail.com>

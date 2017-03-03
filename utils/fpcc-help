@@ -1,12 +1,25 @@
 #!/bin/bash
 ###############################################################################
 
-function usage {
-  echo "fpcc help tool"
+function list_tools {
+cat <<EOT
+Usage: fpcc <tool> <tool_arguments>
+
+Following tools are available:
+
+sig       Create fingerprints for C source code files
+idx       Create a fingerprint index for usage in comp and map
+comp      Compare and compute fingerprint resemblance/containment
+map       Find similar regions in source code given two fingerprint indices
+diff      Display matching sections of two files
+help      Display help information about fpcc
+
+See 'fpcc help <tool>' to read about a specific tool.
+EOT
   exit 0
 }
 
-[[ $# -eq 1  ]] || usage
+[[ $# -ge 1  ]] || list_tools
 
 TOOL=$1
 DOCFILE=$(dirname $0)/../doc/${TOOL}.1.gz

@@ -1,11 +1,15 @@
 NAME
-  fpcc-comp - compare and compute fingerprint resemblance/containment
+  fpcc-comp - Compare and compute fingerprint resemblance/containment
+
 SYNOPSIS
-  fpcc-comp [-b basefile] [-c|-i] [-t threshold] sigfile1 sigfile2
-  fpcc-comp [-b basefile] [-c|-i] [-t threshold] -L filelist
+  fpcc comp [-b basefile] [-c|-i] [-t threshold] sigfile1 sigfile2
+  fpcc comp [-b basefile] [-c|-i] [-t threshold] -L filelist
+
 DESCRIPTION
-  fpcc-comp compares the specified fingerprint indices and reports a
-  quantitative similarity (resemblance/containment).
+  fpcc-comp compares the specified fingerprint indices as produced
+  by fpcc-idx(1) and
+  reports a quantitative similarity (resemblance/containment).
+
 OPTIONS
   -b basefile     The fingerprint of which hashes are ignored.
   -c              Output comparison results in a csv-format
@@ -20,11 +24,20 @@ OPTIONS
   -t threshold    Suppress reporting below the specified threshold. Default: 0
   -L filelist     Path to a file containing the list of files to compare to
                   each other; each path must be on a separate line.
-EXAMPLES
-  fpcc comp myproj.sig otherproj.sig
 
-  fpcc comp -L allsigs.txt
+EXAMPLES
+  Compare two fingerprint indices for resemblance:
+
+    $ fpcc comp myproj.sig otherproj.sig
+
+  Read a list of fingerprint indices from a file and perform an n-to-n
+  comparison:
+
+    $ fpcc comp -L allsigs.txt
+
+
 SEE ALSO
   fpcc-idx(1), fpcc-sig(1)
+
 AUTHOR
   Daniel Prokesch <daniel.prokesch@gmail.com>

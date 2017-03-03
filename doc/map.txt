@@ -1,0 +1,59 @@
+NAME
+  fpcc-map - Find similar regions in source code given two fingerprint indices
+
+SYNOPSIS
+  fpcc map [-l] [-m min_region_size] target source
+
+DESCRIPTION
+ fpcc-map takes two fingerprint indices (as created by fpcc-idx(1)) and finds
+ common regions, that is, consecutive matching hashes.
+
+ The regions are printed to stdout, one line for each region, in the format:
+
+    file1:start1,count1 -- file2:start2,count2
+
+ where the left-hand-side describes regions from the specified target
+ fingerprint index, and the right-hand-side the corresponding regions from the
+ specified source fingerprint index.
+ File[12] refer to the original C files,
+ and start[12] and count[12] refer to the starting line and the region length
+ in number of lines, respectively.
+
+ Using the STSC algorithm (default, see below) the left-hand-side (i.e. target)
+ is sorted, and the intention of this output is to show how the target is
+ made of parts from source.
+
+ The fpcc-diff(1) utility uses the output of fpcc-map to actually display the
+ similar regions.
+
+ Two algorithms are implemented:
+ 1. String-to-String Correction (STSC), default;
+    see
+     - Walter Tichy,
+       "The String-to-String Correction Problem with Block Moves" (1983).
+
+       http://docs.lib.purdue.edu/cgi/viewcontent.cgi?article=1377&context=cstech
+
+ 2. Iterated Longest Common Substring (ILCS);
+    see
+     - https://en.wikipedia.org/wiki/Longest_common_substring_problem#Dynamic_programming
+
+ The STSC algorithm is way faster than ILCS and the output is in the order
+ of the occurences of similar regions in target.
+
+ The output of the ILCS algorithm is sorted by the size of similar regions
+ in descending order.
+
+OPTIONS
+  -l                  Use ILCS instead of the default STSC
+  -m min_region_size  Matching regions (consecutive hashes) below
+                      this value are not emitted. Default: 4
+EXAMPLE
+
+    $ fpcc map myproj.sig otherproj.sig
+
+SEE ALSO
+  fpcc-idx(1), fpcc-diff(1)
+
+AUTHOR
+  Daniel Prokesch <daniel.prokesch@gmail.com>
