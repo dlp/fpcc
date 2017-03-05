@@ -4,8 +4,7 @@ syntax: glob
 ccode.tab.c
 ccode.tab.h
 lex.yy.c
-misc/sigcomp/comp
-misc/sigcomp/sig
-src/{sig,comp,idx,map}
 bin/
 doc/*.gz
+misc/sigcomp/comp
+misc/sigcomp/sig

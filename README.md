@@ -118,11 +118,17 @@ Following changes were made:
 Contribute
 ----------
 
-In principle, all tools except `sig` (the "frontend") are source language
-agnostic.  One could extend `sig` to handle more than C source code.
+* In principle, all tools except `sig` (the "frontend") are source language
+  agnostic.  One could extend `sig` to handle more than C source code.
 
-Reorganize and package the toolbox up, with proper configuration and
-installation.
+* It would be nice to have some html output like [moss][5], where similar
+  regions are anchored and linked in a two subframe view.
+
+* Make the tool suite more portable. For example, there are
+  some unportable calls to `readlink -e`.
+
+* Reorganize and package the toolbox up, with proper configuration and
+  installation.
 
 
 License
@@ -165,3 +171,4 @@ http://docs.lib.purdue.edu/cstech/378
 [2]: http://www.quut.com/c/ANSI-C-grammar-l-2011.html
 [3]: https://theory.stanford.edu/~aiken/publications/papers/sigmod03.pdf
 [4]: https://pdfs.semanticscholar.org/b2ec/74c72d99b755325dc470dec2949d69cd4d57.pdf
+[5]: https://theory.stanford.edu/~aiken/moss/
