@@ -12,7 +12,7 @@ TOOL_EXEC="$(readlink -e $0)-${TOOL}"
 if [[ -x "${TOOL_EXEC}" ]]
 then
   shift
-  exec -a "${PREFIX} ${TOOL}" "${TOOL_EXEC}" $@
+  exec -a "${PREFIX} ${TOOL}" "${TOOL_EXEC}" "$@"
 fi
 
 
