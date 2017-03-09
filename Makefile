@@ -41,7 +41,7 @@ docs: $(MANPAGES)
 $(SUITE_TOOLS): | bin
 
 bin:
-	mkdir $@
+	test -e $@ -a -d $@ || mkdir $@
 
 # shared header
 $(patsubst %.c, %.o, $(wildcard src/*.c)): src/common.h
