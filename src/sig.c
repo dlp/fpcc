@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
           "%s: cannot open %s: %s\n", program_name, argv[i], strerror(errno));
       continue;
     }
-
+    yylineno = 1;
     // print absolute filename
     printfname(argv[i]);
     ntoken = 0;

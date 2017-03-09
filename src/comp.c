@@ -286,7 +286,7 @@ void load(const char *fname, sig_t *sig)
  */
 void count(int *nboth, int *nexcl, sig_t *s0, sig_t *s1, sig_t *sb)
 {
-  int i0=0, i1=0, ib=0, lboth=0, lexcl=0;
+  int i0=1, i1=1, ib=1, lboth=0, lexcl=0;
   while (i0 < s0->count || i1 < s1->count) {
     int cmp = 0;
     if (!(i0 < s0->count)) {
