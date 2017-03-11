@@ -255,12 +255,8 @@ void load(const char *fname, sig_t *sig)
     return;
   }
   DBG("Reading '%s'\n", fname);
-
-  int cnt = fread(&hash_count, sizeof hash_count, 1, f);
-  if (cnt != 1) {
-    (void) fprintf(stderr, "%s: error reading %s\n",
-        program_name, fname);
-    exit(EXIT_FAILURE);
+  if (fread(&hash_count, sizeof hash_count, 1, f) != 1) {
+    goto fail;
   }
   hash_buf = malloc(hash_count * sizeof(hash_entry_t));
   if (hash_buf == NULL) {
@@ -268,15 +264,19 @@ void load(const char *fname, sig_t *sig)
   }
   if (fread(hash_buf, sizeof(hash_entry_t),
         hash_count, f) != hash_count) {
-    (void) fprintf(stderr, "%s: error reading %s\n",
-        program_name, fname);
-    exit(EXIT_FAILURE);
+    goto fail;
   }
   (void) fclose(f);
 
   sig->fname = strdup(fname);
   sig->count = hash_count;
   sig->hashes = hash_buf;
+  return;
+
+fail: ;
+  char msg[PATH_MAX];
+  (void) snprintf(msg, sizeof msg, "error reading '%s'", fname);
+  error_exit(msg);
 }
 
 /**
