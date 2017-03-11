@@ -8,9 +8,11 @@
 SUITE = fpcc
 TOOL_PREFIX = $(SUITE)-
 
+TOOLS = sig comp idx map paths help diff
+
 # all the tools in the resulting bin directory
 SUITE_TOOLS = $(addprefix bin/, $(SUITE) \
-		$(addprefix $(TOOL_PREFIX), sig comp idx map help diff))
+		$(addprefix $(TOOL_PREFIX), $(TOOLS)))
 
 # the manpages are generated from the doc/*.txt files
 MANTXT = $(wildcard doc/*.txt)
