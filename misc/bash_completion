@@ -1,0 +1,69 @@
+#!/bin/bash
+function _fpcc
+{
+    local cur prev cmds
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    cmd="${COMP_WORDS[1]}"
+    cmds="sig idx comp map diff paths help"
+
+    #  Complete the arguments to the commands.
+    case "${cmd}" in
+        sig)
+            COMPREPLY=( $(compgen -f -W "-n -w" -- ${cur}) )
+            return 0
+            ;;
+        idx)
+            if [[ ${prev} != "-o" ]]; then
+              COMPREPLY=( "-o" )
+            else
+              COMPREPLY=( $(compgen -f -- ${cur}) )
+            fi
+            return 0
+            ;;
+        comp)
+            if [[ ${prev} =~ -[bL] ]]; then
+              COMPREPLY=( $(compgen -f -- ${cur}) )
+            elif [[ ${prev} == "-t" ]]; then
+              COMPREPLY=( $(compgen -W "$(seq 0 5 100)" -- ${cur}) )
+            else
+              COMPREPLY=( $(compgen -f -W "-b -c -i -L -t" -- ${cur}) )
+            fi
+            return 0
+            ;;
+        map)
+            if [[ ${prev} == "-m" ]]; then
+              COMPREPLY=( $(compgen -W "$(seq 1 10)" -- ${cur}) )
+            else
+              COMPREPLY=( $(compgen -f -W "-l -m" -- ${cur}) )
+            fi
+            return 0
+            ;;
+        diff)
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+              COMPREPLY=( $(compgen -f -W "-y" -- ${cur}) )
+            else
+              COMPREPLY=( $(compgen -f -- ${cur}) )
+            fi
+            return 0
+            ;;
+        paths)
+            COMPREPLY=( $(compgen -f -- ${cur}) )
+            return 0
+            ;;
+        help)
+            if [[ ${COMP_CWORD} -eq 2 ]]; then
+              COMPREPLY=( $(compgen -W "${cmds}" -- ${cur}) )
+            fi
+            return 0
+            ;;
+        *)
+        ;;
+    esac
+
+   COMPREPLY=($(compgen -W "${cmds}" -- ${cur}))
+   return 0
+}
+complete -F _fpcc fpcc
