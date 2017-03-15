@@ -1,7 +1,7 @@
 #!/bin/bash
 function _fpcc
 {
-    local cur prev cmds
+    local cur prev cmd cmds
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
