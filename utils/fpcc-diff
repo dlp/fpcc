@@ -59,7 +59,7 @@ function section {
     if [[ ${SIDEBYSIDE} -ne 0 ]] || ! which source-highlight 2>&1 >/dev/null
     then
       # print only lines in specified range, with nice numbering
-      awk "NR>=${start} && NR<=${end} {print \$0 }" <(nl -ba -s"  " "${fname}")
+      awk "NR>=${start} && NR<=${end} {print \$0 }" <(expand "${fname}" | nl -ba -s"  ")
     else
       # highlight C source code to terminal, with line numbering
       source-highlight -n -s C -f esc \
