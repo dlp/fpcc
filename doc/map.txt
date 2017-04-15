@@ -48,6 +48,7 @@ OPTIONS
   -l                  Use ILCS instead of the default STSC
   -m min_region_size  Matching regions (consecutive hashes) below
                       this value are not emitted. Default: 4
+
 EXAMPLE
 
     $ fpcc map myproj.sig otherproj.sig

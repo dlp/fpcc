@@ -1,4 +1,11 @@
 #!/bin/bash
+###############################################################################
+# Bash completion for fpcc
+#
+# TODO maybe use .sig as default suffix for indices.
+#
+# (c) 2017 Daniel Prokesch <daniel.prokesch@gmail.com>
+###############################################################################
 function _fpcc
 {
     local cur prev cmd cmds

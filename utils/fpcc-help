@@ -12,6 +12,7 @@ Following tools are available:
   comp      Compare and compute fingerprint resemblance/containment
   map       Find similar regions in source code given two fingerprint indices
   diff      Display matching sections of two files
+  paths     Print the source paths contained in indices
   help      Display help information about fpcc
 
 See 'fpcc help <tool>' to read about a specific tool.

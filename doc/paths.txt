@@ -1,0 +1,21 @@
+NAME
+  fpcc-paths - Print the source paths contained in indices
+
+SYNOPSIS
+  fpcc paths file...
+
+DESCRIPTION
+ fpcc-paths prints the path information given in one or more indices file,
+ one path per line.
+ The source paths are printed as they appear in the given indices,
+ including possibly duplicate paths.
+
+EXAMPLE
+
+    $ fpcc paths proj1.sig proj2.sig
+
+SEE ALSO
+  fpcc-idx(1)
+
+AUTHOR
+  Daniel Prokesch <daniel.prokesch@gmail.com>
